@@ -150,6 +150,14 @@
   .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
 
   /* 債權憑證年度調閱區塊 */
+  .year-section { background:#f3f0ff; border:1px solid #c4b5fd; border-radius:10px; padding:14px 18px; margin-bottom:16px; }
+  .year-section-title { font-size:15px; font-weight:700; color:#5b21b6; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; }
+  .person-block { background:white; border:1px solid #e9d8fd; border-radius:8px; padding:12px 14px; margin-bottom:8px; }
+  .person-block-header { font-size:12px; font-weight:700; color:#44337a; margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+  .person-asset-yes { background:#fff5f5; color:#c53030; border:1px solid #fed7d7; padding:1px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+  .person-asset-no  { background:#f0fff4; color:#276749; border:1px solid #c6f6d5; padding:1px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+  .person-form-block { background:#faf5ff; border:1px solid #e9d8fd; border-radius:8px; padding:12px 14px; margin-bottom:10px; }
+  .person-form-header { font-size:12px; font-weight:700; color:#44337a; margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid #e9d8fd; }
   .cert-section { background: #faf5ff; border: 1px solid #d6bcfa; border-radius: 10px; padding: 16px 20px; margin-bottom: 16px; }
   .cert-section-title { font-size: 13px; font-weight: 700; color: #44337a; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
   .review-card { background: white; border: 1px solid #e9d8fd; border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; }
@@ -502,41 +510,44 @@
 
 <!-- 年度調閱記錄 Modal -->
 <div class="modal-overlay" id="review-modal">
-  <div class="modal" style="width:560px;">
+  <div class="modal" style="width:640px;">
     <div class="modal-title"><span id="review-modal-title">新增年度調閱記錄</span><button class="modal-close" onclick="closeModal('review-modal')">✕</button></div>
-    <div style="background:#faf5ff;border:1px solid #d6bcfa;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#44337a;">
-      📅 記錄本年度綜所稅申報完成後調閱債務人財產及所得清冊的結果。
+    <div style="background:#faf5ff;border:1px solid #d6bcfa;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#44337a;">
+      📅 每位借款人及連保人的財產所得狀況分別記錄，以利個別追蹤。
     </div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">關聯案件</label><select class="form-control" id="fr-case"></select></div>
+      <div class="form-group"><label class="form-label">關聯案件</label>
+        <select class="form-control" id="fr-case" onchange="onReviewCaseChange()"></select>
+      </div>
       <div class="form-group"><label class="form-label">調閱年度</label>
         <select class="form-control" id="fr-year"></select>
       </div>
     </div>
-    <div class="form-row">
-      <div class="form-group"><label class="form-label">綜所稅申報完成日</label><input class="form-control" type="date" id="fr-taxdate" /></div>
-      <div class="form-group"><label class="form-label">財產/所得調閱日</label><input class="form-control" type="date" id="fr-reviewdate" /></div>
+    <div class="form-group"><label class="form-label">綜所稅申報完成日</label>
+      <input class="form-control" type="date" id="fr-taxdate" style="max-width:200px;" />
     </div>
-    <div class="form-group"><label class="form-label">財產清冊結果摘要</label><textarea class="form-control" id="fr-property" rows="2" placeholder="例：名下無不動產、無車輛登記"></textarea></div>
-    <div class="form-group"><label class="form-label">所得清冊結果摘要</label><textarea class="form-control" id="fr-income" rows="2" placeholder="例：全年所得 0 元，無薪資收入"></textarea></div>
-    <div class="form-row">
-      <div class="form-group"><label class="form-label">有無可執行資產</label>
-        <select class="form-control" id="fr-asset">
-          <option value="無">無可執行資產</option>
-          <option value="有">有可執行資產</option>
-        </select>
+    <!-- 各人財產所得欄位（動態產生）-->
+    <div id="fr-persons-container"></div>
+    <!-- 整體處置 -->
+    <div style="background:#f7fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;margin-top:4px;">
+      <div style="font-size:12px;font-weight:700;color:#2d3748;margin-bottom:10px;">整體處置決定</div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">後續處置</label>
+          <select class="form-control" id="fr-action">
+            <option>繼續監控（明年再調閱）</option>
+            <option>聲請再執行</option>
+            <option>結案（停止催收）</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">再執行費用（元）</label>
+          <input class="form-control" type="number" id="fr-execfee" placeholder="0" />
+        </div>
       </div>
-      <div class="form-group"><label class="form-label">後續處置決定</label>
-        <select class="form-control" id="fr-action">
-          <option>繼續監控（明年再調閱）</option>
-          <option>聲請再執行</option>
-          <option>結案（停止催收）</option>
-        </select>
+      <div class="form-group"><label class="form-label">備註</label>
+        <textarea class="form-control" id="fr-notes" rows="2" placeholder="其他補充說明"></textarea>
       </div>
     </div>
-    <div class="form-group"><label class="form-label">再執行費用（元，選填）</label><input class="form-control" type="number" id="fr-execfee" placeholder="0，若本次聲請再執行才需填入" /></div>
-    <div class="form-group"><label class="form-label">備註</label><textarea class="form-control" id="fr-notes" rows="2" placeholder="其他補充說明"></textarea></div>
-    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px;">
       <button class="btn btn-outline" onclick="closeModal('review-modal')">取消</button>
       <button class="btn btn-purple" onclick="saveReview()">儲存記錄</button>
     </div>
@@ -754,8 +765,26 @@ function renderFeeTable() {
 }
 
 // ── 年度調閱 Tab ──────────────────────────────────
+function renderPersonBlocks(persons) {
+  if (!persons||!persons.length) return '<div style="color:#a0aec0;font-size:12px;padding:4px;">（舊格式記錄，無分人資料）</div>';
+  return persons.map(p=>`
+    <div class="person-block">
+      <div class="person-block-header">
+        ${p.role==='借款人'?'👤':'🔗'} ${p.role}：${p.name}
+        ${p.idno?`<span style="font-weight:400;color:#718096;font-family:monospace;font-size:11px;">(${p.idno})</span>`:''}
+        <span class="${p.asset==='有'?'person-asset-yes':'person-asset-no'}" style="margin-left:auto;">${p.asset==='有'?'⚠️ 有資產':'✅ 無資產'}</span>
+      </div>
+      <div class="review-grid">
+        <div class="review-item"><div class="rlabel">調閱日期</div><div class="rvalue">${p.reviewdate||'—'}</div></div>
+        <div class="review-item"><div class="rlabel">財產清冊</div><div class="rvalue">${p.property||'—'}</div></div>
+        <div class="review-item" style="grid-column:1/-1;"><div class="rlabel">所得清冊</div><div class="rvalue">${p.income||'—'}</div></div>
+      </div>
+    </div>`).join('');
+}
+
 function renderReviewsTab() {
-  const cases = loadCases().filter(c=>c.stage==='債權憑證');
+  const allCases = loadCases();
+  const certCases = allCases.filter(c=>c.stage==='債權憑證');
   let reviews = loadReviews();
   const caseFilter = document.getElementById('review-filter-case').value;
   const yearFilter = document.getElementById('review-filter-year').value;
@@ -763,51 +792,60 @@ function renderReviewsTab() {
   // 更新案件下拉
   const caseSel = document.getElementById('review-filter-case');
   const cur = caseSel.value;
-  caseSel.innerHTML = '<option value="">全部債權憑證案件</option>'+cases.map(c=>`<option value="${c.id}" ${c.id===cur?'selected':''}>${c.id} ${c.name}</option>`).join('');
+  caseSel.innerHTML = '<option value="">全部債權憑證案件</option>'+certCases.map(c=>`<option value="${c.id}" ${c.id===cur?'selected':''}>${c.id} ${c.name}</option>`).join('');
 
-  // 更新年度下拉
-  const years = [...new Set(reviews.map(r=>r.year))].sort((a,b)=>b-a);
+  // 更新年度下拉（所有有記錄的年度）
+  const allYears = [...new Set(reviews.map(r=>r.year))].sort((a,b)=>b-a);
   const yearSel = document.getElementById('review-filter-year');
   const curYear = yearSel.value;
-  yearSel.innerHTML = '<option value="">全部年度</option>'+years.map(y=>`<option value="${y}" ${String(y)===curYear?'selected':''}>${y} 年度</option>`).join('');
+  yearSel.innerHTML = '<option value="">全部年度</option>'+allYears.map(y=>`<option value="${y}" ${String(y)===curYear?'selected':''}>${y} 年度</option>`).join('');
 
   if (caseFilter) reviews = reviews.filter(r=>r.caseId===caseFilter);
   if (yearFilter) reviews = reviews.filter(r=>String(r.year)===yearFilter);
-  reviews.sort((a,b)=>b.year-a.year||b.reviewdate.localeCompare(a.reviewdate));
+  reviews.sort((a,b)=>b.year-a.year||a.caseId.localeCompare(b.caseId));
 
   const el = document.getElementById('reviews-content');
   if (reviews.length===0) { el.innerHTML=''; document.getElementById('reviews-empty').style.display='block'; return; }
   document.getElementById('reviews-empty').style.display='none';
 
-  // 依案件分組
-  const grouped = {};
-  reviews.forEach(r => { if (!grouped[r.caseId]) grouped[r.caseId]=[]; grouped[r.caseId].push(r); });
+  // 依「年度」為主分組，年度內再依案件分組
+  const byYear = {};
+  reviews.forEach(r=>{ if(!byYear[r.year]) byYear[r.year]={}; if(!byYear[r.year][r.caseId]) byYear[r.year][r.caseId]=[]; byYear[r.year][r.caseId].push(r); });
+  const sortedYears = Object.keys(byYear).map(Number).sort((a,b)=>b-a);
 
-  el.innerHTML = Object.entries(grouped).map(([caseId, rs]) => {
-    const c = loadCases().find(c=>c.id===caseId);
-    return `<div class="cert-section">
-      <div class="cert-section-title">
-        <span>📄 ${c?c.name:caseId} <span style="font-size:11px;font-weight:400;color:#718096;margin-left:8px;">${caseId} · 逾期 ${c?fmtMoney(c.amount):''}</span></span>
-        <button class="btn btn-purple btn-sm" onclick="openAddReviewFor('${caseId}')">＋ 新增本年度記錄</button>
-      </div>
-      ${rs.map(r => `<div class="review-card">
-        <div class="review-card-header">
-          <div class="review-year">${r.year} 年度調閱</div>
-          <div style="display:flex;gap:6px;align-items:center;">
-            <span class="${r.asset==='有'?'tag-asset-yes':'tag-asset-no'}">${r.asset==='有'?'⚠️ 有可執行資產':'✅ 無可執行資產'}</span>
-            <span class="tag-action">${r.action.split('（')[0]}</span>
-            <button class="btn btn-danger btn-sm" onclick="deleteReview('${r.id}')">刪除</button>
+  el.innerHTML = sortedYears.map(year => {
+    const caseGroups = byYear[year];
+    const casesHtml = Object.entries(caseGroups).map(([caseId, rs]) => {
+      const c = allCases.find(c=>c.id===caseId);
+      const anyAsset = rs.some(r=>r.hasAsset||r.asset==='有');
+      return rs.map(r => `
+        <div class="review-card" style="margin-bottom:12px;">
+          <div class="review-card-header">
+            <div>
+              <span style="font-weight:700;color:#2d3748;">${c?c.name:caseId}</span>
+              <span style="font-size:11px;color:#718096;margin-left:8px;">${caseId}</span>
+              <span class="${(r.hasAsset||r.asset==='有')?'tag-asset-yes':'tag-asset-no'}" style="margin-left:8px;">${(r.hasAsset||r.asset==='有')?'⚠️ 有可執行資產':'✅ 無可執行資產'}</span>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <span class="tag-action">${r.action.split('（')[0]}</span>
+              <button class="btn btn-danger btn-sm" onclick="deleteReview('${r.id}')">刪除</button>
+            </div>
           </div>
-        </div>
-        <div class="review-grid">
-          <div class="review-item"><div class="rlabel">綜所稅申報完成日</div><div class="rvalue">${r.taxdate||'—'}</div></div>
-          <div class="review-item"><div class="rlabel">財產/所得調閱日</div><div class="rvalue">${r.reviewdate||'—'}</div></div>
-          <div class="review-item"><div class="rlabel">財產清冊結果</div><div class="rvalue">${r.property||'—'}</div></div>
-          <div class="review-item"><div class="rlabel">所得清冊結果</div><div class="rvalue">${r.income||'—'}</div></div>
-          ${r.execfee>0?`<div class="review-item"><div class="rlabel">再執行費用</div><div class="rvalue" style="color:#c53030;">${fmtMoney(r.execfee)}</div></div>`:''}
-          ${r.notes?`<div class="review-item" style="grid-column:1/-1;"><div class="rlabel">備註</div><div class="rvalue">${r.notes}</div></div>`:''}
-        </div>
-      </div>`).join('')}
+          <div class="review-grid" style="margin-bottom:${r.persons&&r.persons.length?'8px':'0'};">
+            <div class="review-item"><div class="rlabel">綜所稅申報完成日</div><div class="rvalue">${r.taxdate||'—'}</div></div>
+            ${r.execfee>0?`<div class="review-item"><div class="rlabel">再執行費用</div><div class="rvalue" style="color:#c53030;">${fmtMoney(r.execfee)}</div></div>`:''}
+            ${r.notes?`<div class="review-item" style="grid-column:1/-1;"><div class="rlabel">備註</div><div class="rvalue">${r.notes}</div></div>`:''}
+          </div>
+          ${renderPersonBlocks(r.persons)}
+        </div>`).join('');
+    }).join('');
+
+    return `<div class="year-section">
+      <div class="year-section-title">
+        <span>📅 民國 ${year} 年度調閱</span>
+        <span style="font-size:12px;font-weight:400;color:#7c3aed;">${Object.keys(caseGroups).length} 件</span>
+      </div>
+      ${casesHtml}
     </div>`;
   }).join('');
 }
@@ -969,17 +1007,19 @@ function viewDetail(id) {
       <div class="cert-section-title"><span>📅 債權憑證年度調閱記錄（${reviews.length} 次）</span>
         <button class="btn btn-purple btn-sm" onclick="closeModal('detail-modal');openAddReviewFor('${id}')">＋ 新增本年度記錄</button>
       </div>
-      ${reviews.length?reviews.map(r=>`<div class="review-card">
+      ${reviews.length?reviews.map(r=>`<div class="review-card" style="margin-bottom:10px;">
         <div class="review-card-header">
           <div class="review-year">${r.year} 年度</div>
-          <div style="display:flex;gap:6px;"><span class="${r.asset==='有'?'tag-asset-yes':'tag-asset-no'}">${r.asset==='有'?'⚠️ 有資產':'✅ 無資產'}</span><span class="tag-action">${r.action.split('（')[0]}</span></div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <span class="${(r.hasAsset||r.asset==='有')?'tag-asset-yes':'tag-asset-no'}">${(r.hasAsset||r.asset==='有')?'⚠️ 有資產':'✅ 無資產'}</span>
+            <span class="tag-action">${r.action.split('（')[0]}</span>
+          </div>
         </div>
-        <div class="review-grid">
-          <div class="review-item"><div class="rlabel">調閱日期</div><div class="rvalue">${r.reviewdate||'—'}</div></div>
-          <div class="review-item"><div class="rlabel">財產清冊</div><div class="rvalue">${r.property||'—'}</div></div>
-          <div class="review-item"><div class="rlabel">所得清冊</div><div class="rvalue">${r.income||'—'}</div></div>
+        <div class="review-grid" style="margin-bottom:${r.persons&&r.persons.length?'8px':'0'};">
+          <div class="review-item"><div class="rlabel">綜所稅申報完成日</div><div class="rvalue">${r.taxdate||'—'}</div></div>
           ${r.execfee>0?`<div class="review-item"><div class="rlabel">再執行費</div><div class="rvalue" style="color:#c53030;">${fmtMoney(r.execfee)}</div></div>`:''}
         </div>
+        ${renderPersonBlocks(r.persons)}
       </div>`).join(''):'<div style="text-align:center;color:#a0aec0;padding:16px;font-size:13px;">尚無調閱記錄，請新增本年度記錄。</div>'}
     </div>`:'';
 
@@ -1076,41 +1116,95 @@ function fillYearSelect(selId) {
   const opts=[]; for(let y=cur;y>=cur-10;y--) opts.push(y);
   document.getElementById(selId).innerHTML=opts.map(y=>`<option value="${y}">${y}</option>`).join('');
 }
-function openAddReview() {
-  refreshReviewCaseSel('fr-case'); fillYearSelect('fr-year');
+function buildPersonsForm(caseId) {
+  const c = loadCases().find(x=>x.id===caseId);
+  if (!c) { document.getElementById('fr-persons-container').innerHTML=''; return; }
+  const persons = [
+    { role:'借款人', type:c.borrowerType||'自然人', name:c.name, idno:c.idno||'' },
+    ...(c.guarantors||[]).map(g=>({ role:'連保人', type:g.type, name:g.name, idno:g.idno||'' }))
+  ];
+  document.getElementById('fr-persons-container').innerHTML = persons.map((p,i)=>`
+    <div class="person-form-block">
+      <div class="person-form-header">
+        ${p.role==='借款人'?'👤':'🔗'} ${p.role}：${p.name}
+        ${p.idno?`<span style="font-weight:400;color:#718096;font-family:monospace;font-size:11px;">(${p.idno})</span>`:''}
+      </div>
+      <div class="form-row" style="margin-bottom:8px;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">調閱日期</label>
+          <input class="form-control" type="date" id="fr-p-date-${i}" />
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">有無可執行資產</label>
+          <select class="form-control" id="fr-p-asset-${i}">
+            <option value="無">✅ 無可執行資產</option>
+            <option value="有">⚠️ 有可執行資產</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label class="form-label">財產清冊結果</label>
+        <textarea class="form-control" id="fr-p-property-${i}" rows="2" placeholder="例：名下無不動產、無車輛"></textarea>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">所得清冊結果</label>
+        <textarea class="form-control" id="fr-p-income-${i}" rows="2" placeholder="例：全年所得 0 元，無薪資"></textarea>
+      </div>
+      <input type="hidden" id="fr-p-role-${i}" value="${p.role}" />
+      <input type="hidden" id="fr-p-name-${i}" value="${p.name}" />
+      <input type="hidden" id="fr-p-idno-${i}" value="${p.idno}" />
+    </div>`).join('');
+}
+
+function onReviewCaseChange() {
+  buildPersonsForm(document.getElementById('fr-case').value);
+}
+
+function openAddReview(caseId='') {
+  refreshReviewCaseSel('fr-case', caseId); fillYearSelect('fr-year');
   document.getElementById('review-modal-title').textContent='新增年度調閱記錄';
-  ['fr-taxdate','fr-reviewdate'].forEach(id=>document.getElementById(id).value='');
-  ['fr-property','fr-income','fr-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('fr-taxdate').value='';
   document.getElementById('fr-execfee').value='';
-  document.getElementById('fr-asset').value='無';
+  document.getElementById('fr-notes').value='';
   document.getElementById('fr-action').value='繼續監控（明年再調閱）';
+  const selCase = caseId || document.getElementById('fr-case').value;
+  buildPersonsForm(selCase);
   openModal('review-modal');
 }
-function openAddReviewFor(caseId) {
-  openAddReview();
-  refreshReviewCaseSel('fr-case', caseId);
-}
+function openAddReviewFor(caseId) { openAddReview(caseId); }
+
 function saveReview() {
   const caseId=document.getElementById('fr-case').value;
   if(!caseId){alert('請選擇關聯案件');return;}
   const year=Number(document.getElementById('fr-year').value);
+  // 收集各人資料
+  const container=document.getElementById('fr-persons-container');
+  const blocks=container.querySelectorAll('.person-form-block');
+  const persons=[...blocks].map((_,i)=>({
+    role: document.getElementById('fr-p-role-'+i).value,
+    name: document.getElementById('fr-p-name-'+i).value,
+    idno: document.getElementById('fr-p-idno-'+i).value,
+    reviewdate: document.getElementById('fr-p-date-'+i).value,
+    property: document.getElementById('fr-p-property-'+i).value.trim(),
+    income: document.getElementById('fr-p-income-'+i).value.trim(),
+    asset: document.getElementById('fr-p-asset-'+i).value,
+  }));
+  const hasAsset = persons.some(p=>p.asset==='有');
   const reviews=loadReviews();
   const rec={
     id:'R'+Date.now(), caseId, year,
     taxdate:document.getElementById('fr-taxdate').value,
-    reviewdate:document.getElementById('fr-reviewdate').value,
-    property:document.getElementById('fr-property').value.trim(),
-    income:document.getElementById('fr-income').value.trim(),
-    asset:document.getElementById('fr-asset').value,
+    persons,
+    hasAsset,
     action:document.getElementById('fr-action').value,
     execfee:Number(document.getElementById('fr-execfee').value)||0,
     notes:document.getElementById('fr-notes').value.trim(),
   };
   reviews.push(rec);
-  // 若決定再執行且有填費用，自動新增費用記錄
   if(rec.action==='聲請再執行'&&rec.execfee>0) {
+    const firstDate=persons.find(p=>p.reviewdate)?.reviewdate||today();
     const fees=loadFees();
-    fees.push({id:'F'+Date.now(),caseId,date:rec.reviewdate||today(),type:'執行費',desc:`${year}年度再執行費用`,amount:rec.execfee,pay:'公司代墊',receipt:'',isPayment:false});
+    fees.push({id:'F'+Date.now(),caseId,date:firstDate,type:'執行費',desc:`${year}年度再執行費用`,amount:rec.execfee,pay:'公司代墊',receipt:'',isPayment:false});
     saveFees(fees);
   }
   saveReviews(reviews); closeModal('review-modal'); refresh();
@@ -1141,10 +1235,14 @@ function exportExcel() {
     return [f.isPayment?'收款沖銷':'代墊費用',f.date,f.caseId,c?c.name:'',f.type,f.desc,f.isPayment?'':f.amount,f.isPayment?f.amount:'',f.pay,f.receipt||''];
   });
 
-  const revHeaders=['案件編號','借款人','年度','綜所稅申報完成日','調閱日期','財產清冊結果','所得清冊結果','有無可執行資產','後續處置','再執行費用','備註'];
-  const revRows=reviews.map(r=>{
+  const revHeaders=['案件編號','借款人','年度','綜所稅申報完成日','角色','姓名/公司','證號','調閱日期','財產清冊結果','所得清冊結果','有無可執行資產','整體處置','再執行費用','備註'];
+  const revRows=[];
+  reviews.forEach(r=>{
     const c=cases.find(c=>c.id===r.caseId);
-    return [r.caseId,c?c.name:'',r.year,r.taxdate||'',r.reviewdate||'',r.property||'',r.income||'',r.asset,r.action,r.execfee||0,r.notes||''];
+    const persons=r.persons&&r.persons.length?r.persons:[{role:'—',name:c?c.name:'',idno:'',reviewdate:r.reviewdate||'',property:r.property||'',income:r.income||'',asset:r.asset||'—'}];
+    persons.forEach(p=>{
+      revRows.push([r.caseId,c?c.name:'',r.year,r.taxdate||'',p.role,p.name,p.idno||'',p.reviewdate||'',p.property||'',p.income||'',p.asset,r.action,r.execfee||0,r.notes||'']);
+    });
   });
 
   let csv='﻿';
