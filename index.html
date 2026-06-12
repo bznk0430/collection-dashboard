@@ -136,6 +136,16 @@
   .stage-step:not(.done):not(.current):not(.current-cert)::after { border-left: 7px solid #e2e8f0; }
 
   .empty-state { text-align: center; padding: 40px; color: #a0aec0; }
+  /* 本金追蹤 */
+  .principal-summary { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:0; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; margin-bottom:16px; }
+  .principal-box { padding:12px 16px; text-align:center; }
+  .principal-box:not(:last-child) { border-right:1px solid #e2e8f0; }
+  .principal-box .plabel { font-size:10px; color:#718096; font-weight:600; text-transform:uppercase; letter-spacing:0.4px; }
+  .principal-box .pvalue { font-size:17px; font-weight:700; margin-top:5px; }
+  .recovery-table { width:100%; border-collapse:collapse; }
+  .recovery-table th { text-align:left; font-size:11px; font-weight:600; color:#718096; padding:7px 12px; border-bottom:2px solid #e2e8f0; text-transform:uppercase; white-space:nowrap; }
+  .recovery-table td { padding:8px 12px; border-bottom:1px solid #f0f4f8; font-size:13px; }
+  .recovery-table tr:hover td { background:#f7fafc; }
 
   /* 借款人類型 & 連保人 */
   .type-toggle { display:flex; gap:0; border:1px solid #e2e8f0; border-radius:6px; overflow:hidden; }
@@ -412,8 +422,12 @@
       <div id="guarantor-empty" style="font-size:12px;color:#a0aec0;text-align:center;padding:8px;">無共同發票人</div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">逾期金額（元）</label><input class="form-control" type="number" id="f-amount" placeholder="0" /></div>
-      <div class="form-group"><label class="form-label">逾期天數</label><input class="form-control" id="f-days-display" readonly style="background:#f7fafc;color:#718096;cursor:default;" placeholder="依登記日期自動計算" /></div>
+      <div class="form-group"><label class="form-label">逾期本金（元）</label><input class="form-control" type="number" id="f-amount" placeholder="0" oninput="updateCaseTotal()" /></div>
+      <div class="form-group"><label class="form-label">利息金額（元）</label><input class="form-control" type="number" id="f-interest" placeholder="0（可留空）" oninput="updateCaseTotal()" /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label" style="color:#718096;">逾期天數</label><input class="form-control" id="f-days-display" readonly style="background:#f7fafc;color:#718096;cursor:default;" placeholder="依登記日期自動計算" /></div>
+      <div class="form-group"><label class="form-label" style="color:#718096;">本金＋利息合計</label><input class="form-control" id="f-total-display" readonly style="background:#f7fafc;color:#718096;cursor:default;" placeholder="自動加總" /></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">催收階段</label>
@@ -554,11 +568,36 @@
   </div>
 </div>
 
+<!-- 本金催回 Modal -->
+<div class="modal-overlay" id="recovery-modal">
+  <div class="modal" style="width:480px;">
+    <div class="modal-title"><span id="recovery-modal-title">記錄本金催回</span><button class="modal-close" onclick="closeModal('recovery-modal')">✕</button></div>
+    <div style="background:#ebf8ff;border:1px solid #bee3f8;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#2b6cb0;">
+      💰 記錄本次催收回來的本金金額，系統自動計算剩餘本金餘額。
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">關聯案件</label><select class="form-control" id="rc-case" onchange="updateRecoveryHint()"></select></div>
+      <div class="form-group"><label class="form-label">催回日期</label><input class="form-control" type="date" id="rc-date" /></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">催回本金金額（元）</label>
+      <input class="form-control" type="number" id="rc-amount" placeholder="0" oninput="updateRecoveryHint()" />
+      <div id="rc-hint" style="font-size:12px;color:#718096;margin-top:6px;"></div>
+    </div>
+    <div class="form-group"><label class="form-label">備註</label><textarea class="form-control" id="rc-notes" rows="2" placeholder="例：借款人第一期還款、法院強制執行撥款..."></textarea></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+      <button class="btn btn-outline" onclick="closeModal('recovery-modal')">取消</button>
+      <button class="btn btn-primary" onclick="saveRecovery()">儲存</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── 資料層 ────────────────────────────────────────
-const CASES_KEY   = 'bznk_cases_v1';
-const FEES_KEY    = 'bznk_fees_v2';
-const REVIEWS_KEY = 'bznk_reviews_v1';
+const CASES_KEY      = 'bznk_cases_v1';
+const FEES_KEY       = 'bznk_fees_v2';
+const REVIEWS_KEY    = 'bznk_reviews_v1';
+const RECOVERIES_KEY = 'bznk_recoveries_v1';
 
 function loadCases()   { try { return JSON.parse(localStorage.getItem(CASES_KEY)   || '[]'); } catch(e) { return []; } }
 function saveCases(d)  { localStorage.setItem(CASES_KEY,   JSON.stringify(d)); }
@@ -566,6 +605,14 @@ function loadFees()    { try { return JSON.parse(localStorage.getItem(FEES_KEY) 
 function saveFees(d)   { localStorage.setItem(FEES_KEY,    JSON.stringify(d)); }
 function loadReviews() { try { return JSON.parse(localStorage.getItem(REVIEWS_KEY) || '[]'); } catch(e) { return []; } }
 function saveReviews(d){ localStorage.setItem(REVIEWS_KEY, JSON.stringify(d)); }
+function loadRecoveries() { try { return JSON.parse(localStorage.getItem(RECOVERIES_KEY)||'[]'); } catch(e) { return []; } }
+function saveRecoveries(d){ localStorage.setItem(RECOVERIES_KEY, JSON.stringify(d)); }
+
+function caseRecoverySummary(caseId) {
+  const recs = loadRecoveries().filter(r=>r.caseId===caseId);
+  const recovered = recs.reduce((s,r)=>s+Number(r.amount||0),0);
+  return { recovered, count: recs.length };
+}
 
 function caseFeesSummary(caseId) {
   const fees = loadFees().filter(f => f.caseId === caseId);
@@ -587,6 +634,12 @@ function calcDays(dateStr) {
   const now = new Date();
   now.setHours(0,0,0,0); start.setHours(0,0,0,0);
   return Math.max(0, Math.round((now - start) / 86400000));
+}
+function updateCaseTotal() {
+  const a = Number(document.getElementById('f-amount').value)||0;
+  const i = Number(document.getElementById('f-interest').value)||0;
+  const el = document.getElementById('f-total-display');
+  if (el) el.value = (a+i>0) ? fmtMoney(a+i) : '';
 }
 function thisYear() { return new Date().getFullYear(); }
 
@@ -624,7 +677,11 @@ function seedData() {
 function renderStats() {
   const cases = loadCases();
   const fees  = loadFees();
-  const totalLoan   = cases.reduce((s,c) => s+Number(c.amount||0), 0);
+  const totalLoan     = cases.reduce((s,c) => s+Number(c.amount||0), 0);
+  const totalInterest = cases.reduce((s,c) => s+Number(c.interest||0), 0);
+  const recoveries    = loadRecoveries();
+  const totalRecovered= recoveries.reduce((s,r)=>s+Number(r.amount||0),0);
+  const remainPrincipal = Math.max(0, totalLoan - totalRecovered);
   const totalOut    = fees.filter(f=>!f.isPayment).reduce((s,f)=>s+Number(f.amount||0), 0);
   const totalIn     = fees.filter(f=> f.isPayment).reduce((s,f)=>s+Number(f.amount||0), 0);
   const netFees     = totalOut - totalIn;
@@ -632,9 +689,9 @@ function renderStats() {
   const certCases   = cases.filter(c=>c.stage==='債權憑證').length;
   document.getElementById('stats-grid').innerHTML = `
     <div class="stat-card blue"><div class="stat-label">總案件數</div><div class="stat-value">${cases.length}</div><div class="stat-sub">進行中 ${activeCases} 件</div></div>
-    <div class="stat-card red"><div class="stat-label">總逾期金額</div><div class="stat-value" style="font-size:19px;">${fmtM(totalLoan)}</div><div class="stat-sub">平均 ${cases.length?fmtM(Math.round(totalLoan/cases.length)):'$0'}/件</div></div>
-    <div class="stat-card orange"><div class="stat-label">累計代墊費用</div><div class="stat-value" style="font-size:19px;">${fmtM(totalOut)}</div><div class="stat-sub">${fees.filter(f=>!f.isPayment).length} 筆記錄</div></div>
-    <div class="stat-card green"><div class="stat-label">已收回費用</div><div class="stat-value" style="font-size:19px;color:#276749;">${fmtM(totalIn)}</div><div class="stat-sub">淨墊款 ${fmtM(netFees)}</div></div>
+    <div class="stat-card red"><div class="stat-label">總逾期本金</div><div class="stat-value" style="font-size:17px;">${fmtM(totalLoan)}</div><div class="stat-sub">利息 ${fmtM(totalInterest)}</div></div>
+    <div class="stat-card green"><div class="stat-label">已催回本金</div><div class="stat-value" style="font-size:17px;color:#276749;">${fmtM(totalRecovered)}</div><div class="stat-sub">剩餘 ${fmtM(remainPrincipal)}</div></div>
+    <div class="stat-card orange"><div class="stat-label">累計代墊費用</div><div class="stat-value" style="font-size:17px;">${fmtM(totalOut)}</div><div class="stat-sub">淨墊款 ${fmtM(netFees)}</div></div>
     <div class="stat-card purple"><div class="stat-label">債權憑證監控中</div><div class="stat-value">${certCases}</div><div class="stat-sub">件持續年度追蹤</div></div>
   `;
 }
@@ -706,7 +763,7 @@ function renderTable() {
     return `<tr style="border-bottom:1px solid #f0f4f8;${rowBg}">
       <td style="padding:10px 12px;font-size:12px;font-family:monospace;color:#4a5568;">${c.id}</td>
       <td style="padding:10px 12px;font-weight:600;">${c.name} <span class="badge badge-${c.borrowerType||'自然人'}" style="font-size:10px;">${c.borrowerType==='法人'?'法人':'自然人'}</span>${isCert?` <span style="font-size:10px;color:#6b46c1;font-weight:600;">📅${certCount}次</span>`:''}</td>
-      <td style="padding:10px 12px;color:#c53030;font-weight:600;">${fmtM(c.amount)}<br><span style='font-size:11px;color:#718096;font-weight:400;'>逾期 ${calcDays(c.date)} 天</span></td>
+      <td style="padding:10px 12px;color:#c53030;font-weight:600;">${fmtM(c.amount)}${c.interest?`<span style='font-size:10px;color:#718096;'>+息${fmtM(c.interest)}</span>`:''}<br><span style='font-size:11px;color:#718096;font-weight:400;'>逾期 ${calcDays(c.date)} 天｜餘${fmtM(c.amount-caseRecoverySummary(c.id).recovered)}</span></td>
       <td style="padding:10px 12px;"><span class="badge badge-${c.stage}">${c.stage}</span></td>
       <td style="padding:10px 12px;font-size:12px;color:#4a5568;">${c.lawyer||'—'}</td>
       <td style="padding:10px 12px;font-size:12px;color:#4a5568;">${c.court||'—'}</td>
@@ -755,8 +812,8 @@ function renderFeeTable() {
   tbody.innerHTML = fees.map(f => {
     const c = cases.find(c=>c.id===f.caseId);
     return f.isPayment
-      ? `<tr class="row-payment"><td>${f.date}</td><td style="font-size:12px;font-family:monospace;">${f.caseId}</td><td style="font-weight:500;">${c?c.name:'—'}</td><td><span class="tag-payment">📥 收款沖銷</span></td><td style="color:#276749;">${f.desc}</td><td style="color:#a0aec0;">—</td><td class="amount-in">+ ${fmtM(f.amount)}</td><td style="font-size:12px;color:#718096;">${f.pay}</td><td style="font-size:12px;color:#a0aec0;">${f.receipt||'—'}</td><td><button class="btn btn-danger btn-sm" onclick="deleteFee('${f.id}')">刪除</button></td></tr>`
-      : `<tr class="row-fee"><td>${f.date}</td><td style="font-size:12px;font-family:monospace;">${f.caseId}</td><td style="font-weight:500;">${c?c.name:'—'}</td><td><span class="tag-fee">📤 ${f.type}</span></td><td style="color:#4a5568;">${f.desc}</td><td class="amount-out">- ${fmtM(f.amount)}</td><td style="color:#a0aec0;">—</td><td style="font-size:12px;color:#718096;">${f.pay}</td><td style="font-size:12px;color:#a0aec0;">${f.receipt||'—'}</td><td><button class="btn btn-danger btn-sm" onclick="deleteFee('${f.id}')">刪除</button></td></tr>`;
+      ? `<tr class="row-payment"><td>${f.date}</td><td style="font-size:12px;font-family:monospace;">${f.caseId}</td><td style="font-weight:500;">${c?c.name:'—'}</td><td><span class="tag-payment">📥 收款沖銷</span></td><td style="color:#276749;">${f.desc}</td><td style="color:#a0aec0;">—</td><td class="amount-in">+ ${fmtM(f.amount)}</td><td style="font-size:12px;color:#718096;">${f.pay}</td><td style="font-size:12px;color:#a0aec0;">${f.receipt||'—'}</td><td style="white-space:nowrap;"><button class="btn btn-outline btn-sm" onclick="editFeeRecord('${f.id}')">編輯</button> <button class="btn btn-danger btn-sm" onclick="deleteFee('${f.id}')">刪除</button></td></tr>`
+      : `<tr class="row-fee"><td>${f.date}</td><td style="font-size:12px;font-family:monospace;">${f.caseId}</td><td style="font-weight:500;">${c?c.name:'—'}</td><td><span class="tag-fee">📤 ${f.type}</span></td><td style="color:#4a5568;">${f.desc}</td><td class="amount-out">- ${fmtM(f.amount)}</td><td style="color:#a0aec0;">—</td><td style="font-size:12px;color:#718096;">${f.pay}</td><td style="font-size:12px;color:#a0aec0;">${f.receipt||'—'}</td><td style="white-space:nowrap;"><button class="btn btn-outline btn-sm" onclick="editFeeRecord('${f.id}')">編輯</button> <button class="btn btn-danger btn-sm" onclick="deleteFee('${f.id}')">刪除</button></td></tr>`;
   }).join('');
 
   const tOut=fees.filter(f=>!f.isPayment).reduce((s,f)=>s+Number(f.amount||0),0);
@@ -932,7 +989,7 @@ function openAddCase() {
   document.getElementById('modal-title-text').textContent='新增催收案件';
   document.getElementById('f-id').value=genId();
   document.getElementById('f-date').value=today();
-  ['f-name','f-idno','f-amount','f-court','f-lawyer','f-casenumber','f-gdlink','f-notes'].forEach(id=>document.getElementById(id).value='');
+  ['f-name','f-idno','f-amount','f-interest','f-court','f-lawyer','f-casenumber','f-gdlink','f-notes'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-days-display').value='';
   document.getElementById('f-stage').value='存證信函';
   document.getElementById('f-btype-person').checked=true;
@@ -946,7 +1003,9 @@ function editCase(id) {
   document.getElementById('modal-title-text').textContent='編輯催收案件';
   document.getElementById('f-id').value=c.id; document.getElementById('f-date').value=c.date;
   document.getElementById('f-name').value=c.name; document.getElementById('f-idno').value=c.idno||'';
-  document.getElementById('f-amount').value=c.amount; document.getElementById('f-days-display').value=calcDays(c.date)+' 天';
+  document.getElementById('f-amount').value=c.amount; document.getElementById('f-interest').value=c.interest||'';
+  document.getElementById('f-days-display').value=calcDays(c.date)+' 天';
+  updateCaseTotal();
   document.getElementById('f-stage').value=c.stage; document.getElementById('f-court').value=c.court||'';
   document.getElementById('f-lawyer').value=c.lawyer||''; document.getElementById('f-casenumber').value=c.casenumber||'';
   document.getElementById('f-gdlink').value=c.gdlink||''; document.getElementById('f-notes').value=c.notes||'';
@@ -964,7 +1023,7 @@ function saveCase() {
     id:document.getElementById('f-id').value.trim(), date:document.getElementById('f-date').value,
     name:document.getElementById('f-name').value.trim(), idno:document.getElementById('f-idno').value.trim(),
     borrowerType, guarantors:getGuarantors(),
-    amount:Number(document.getElementById('f-amount').value)||0, days:calcDays(document.getElementById('f-date').value),
+    amount:Number(document.getElementById('f-amount').value)||0, interest:Number(document.getElementById('f-interest').value)||0, days:calcDays(document.getElementById('f-date').value),
     stage:document.getElementById('f-stage').value, court:document.getElementById('f-court').value.trim(),
     lawyer:document.getElementById('f-lawyer').value.trim(), casenumber:document.getElementById('f-casenumber').value.trim(),
     gdlink:document.getElementById('f-gdlink').value.trim(), notes:document.getElementById('f-notes').value.trim(),
@@ -980,6 +1039,7 @@ function deleteCase(id) {
   saveCases(loadCases().filter(c=>c.id!==id));
   saveFees(loadFees().filter(f=>f.caseId!==id));
   saveReviews(loadReviews().filter(r=>r.caseId!==id));
+  saveRecoveries(loadRecoveries().filter(r=>r.caseId!==id));
   refresh();
 }
 
@@ -1033,7 +1093,8 @@ function viewDetail(id) {
         <div class="value">${c.name} <span class="badge badge-${c.borrowerType||'自然人'}" style="margin-left:4px;">${c.borrowerType==='法人'?'🏢 法人':'👤 自然人'}</span></div>
       </div>
       <div class="detail-item"><div class="label">${c.borrowerType==='法人'?'統一編號':'身分證字號'}</div><div class="value" style="font-family:monospace;">${c.idno||'—'}</div></div>
-      <div class="detail-item"><div class="label">逾期金額</div><div class="value" style="color:#c53030;">${fmtMoney(c.amount)}<span style="font-size:12px;color:#718096;font-weight:400;margin-left:8px;">逾期 ${calcDays(c.date)} 天</span></div></div>
+      <div class="detail-item"><div class="label">逾期本金</div><div class="value" style="color:#c53030;">${fmtMoney(c.amount)}<span style="font-size:12px;color:#718096;font-weight:400;margin-left:8px;">逾期 ${calcDays(c.date)} 天</span></div></div>
+      <div class="detail-item"><div class="label">利息金額</div><div class="value" style="color:#c05621;">${c.interest?fmtMoney(c.interest):'<span style=\'color:#a0aec0;\'>未設定</span>'}</div></div>
       <div class="detail-item"><div class="label">催收階段</div><div class="value"><span class="badge badge-${c.stage}">${c.stage}</span></div></div>
       <div class="detail-item"><div class="label">管轄法院</div><div class="value">${c.court||'—'}</div></div>
       <div class="detail-item"><div class="label">案件字號</div><div class="value" style="font-size:12px;">${c.casenumber||'—'}</div></div>
@@ -1050,6 +1111,29 @@ function viewDetail(id) {
       <div class="offset-box in"><div class="label">📥 已收回</div><div class="value">${fmtM(totalIn)}</div></div>
       <div class="offset-box net"><div class="label">⚖️ 淨墊款餘額</div><div class="value">${fmtM(net)}</div></div>
     </div>
+    ${(()=>{
+      const recs=loadRecoveries().filter(r=>r.caseId===id).sort((a,b)=>b.date.localeCompare(a.date));
+      const recovered=recs.reduce((s,r)=>s+Number(r.amount||0),0);
+      const remaining=Math.max(0,Number(c.amount||0)-recovered);
+      const totalDue=(Number(c.amount||0)+Number(c.interest||0));
+      return `<div class="principal-summary" style="margin-bottom:16px;">
+        <div class="principal-box"><div class="plabel">逾期本金</div><div class="pvalue" style="color:#c53030;">${fmtM(c.amount)}</div></div>
+        <div class="principal-box"><div class="plabel">利息</div><div class="pvalue" style="color:#c05621;">${c.interest?fmtM(c.interest):'—'}</div></div>
+        <div class="principal-box"><div class="plabel">已催回本金</div><div class="pvalue" style="color:#276749;">${fmtM(recovered)}</div></div>
+        <div class="principal-box" style="background:#fffbeb;"><div class="plabel">剩餘本金</div><div class="pvalue" style="color:#dd6b20;">${fmtM(remaining)}</div></div>
+      </div>
+      ${recs.length?`<div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#2d3748;">💰 本金催回明細</div>
+      <table class="recovery-table" style="margin-bottom:16px;">
+        <thead><tr><th>日期</th><th>催回金額</th><th>備註</th><th></th></tr></thead>
+        <tbody>${recs.map(r=>`<tr>
+          <td>${r.date}</td>
+          <td style="font-weight:600;color:#276749;">${fmtM(r.amount)}</td>
+          <td style="color:#4a5568;">${r.notes||'—'}</td>
+          <td><button class="btn btn-danger btn-sm" onclick="deleteRecovery('${r.id}')">刪除</button></td>
+        </tr>`).join('')}</tbody>
+        <tfoot><tr style="background:#f0fff4;font-weight:700;"><td style="padding:8px 12px;">合計</td><td style="padding:8px 12px;color:#276749;">${fmtM(recovered)}</td><td colspan="2" style="padding:8px 12px;color:#dd6b20;">剩餘 ${fmtM(remaining)}</td></tr></tfoot>
+      </table>`:''}`;
+    })()}
     ${c.gdlink?`<div class="gd-note" style="justify-content:space-between;">
       <span>📂 <a href="${c.gdlink}" target="_blank" style="color:#2b6cb0;font-weight:600;">開啟 Google Drive 法院文件資料夾</a></span>
       <button class="btn btn-outline btn-sm" onclick="syncDriveFiles('${c.id}','${c.gdlink}')" style="font-size:12px;">🔄 同步文件清單</button>
@@ -1064,7 +1148,8 @@ function viewDetail(id) {
     </table>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-outline" onclick="closeModal('detail-modal')">關閉</button>
-      <button class="btn btn-teal" onclick="closeModal('detail-modal');openAddPaymentFor('${c.id}')">📥 記錄收款</button>
+      <button class="btn btn-primary" onclick="closeModal('detail-modal');openAddRecoveryFor('${c.id}')">💰 記錄催回本金</button>
+      <button class="btn btn-teal" onclick="closeModal('detail-modal');openAddPaymentFor('${c.id}')">📥 記錄費用收款</button>
       <button class="btn btn-warning" onclick="closeModal('detail-modal');editCase('${c.id}')">編輯案件</button>
     </div>`;
   openModal('detail-modal');
@@ -1075,16 +1160,44 @@ function refreshCaseSel(selId) {
   const cases=loadCases().filter(c=>c.stage!=='結案');
   document.getElementById(selId).innerHTML=cases.map(c=>`<option value="${c.id}">${c.id} ${c.name}</option>`).join('');
 }
-function openAddFee() { refreshCaseSel('ff-case'); document.getElementById('ff-date').value=today(); ['ff-amount','ff-desc','ff-receipt'].forEach(id=>document.getElementById(id).value=''); openModal('fee-modal'); }
+let editingFeeId = null;
+
+function openAddFee() {
+  editingFeeId = null;
+  refreshCaseSel('ff-case');
+  document.getElementById('ff-date').value=today();
+  ['ff-amount','ff-desc','ff-receipt'].forEach(id=>document.getElementById(id).value='');
+  document.querySelector('#fee-modal .modal-title span').textContent='新增代墊費用';
+  document.getElementById('ff-case').disabled = false;
+  openModal('fee-modal');
+}
 function saveFee() {
   const caseId=document.getElementById('ff-case').value, amount=Number(document.getElementById('ff-amount').value)||0;
   if(!caseId){alert('請選擇關聯案件');return;} if(!amount){alert('請輸入費用金額');return;}
-  loadFees().push; const fees=loadFees();
-  fees.push({id:'F'+Date.now(),caseId,date:document.getElementById('ff-date').value,type:document.getElementById('ff-type').value,desc:document.getElementById('ff-desc').value.trim(),amount,pay:document.getElementById('ff-pay').value,receipt:document.getElementById('ff-receipt').value.trim(),isPayment:false});
-  saveFees(fees); closeModal('fee-modal'); refresh();
+  let fees=loadFees();
+  const rec={caseId,date:document.getElementById('ff-date').value,type:document.getElementById('ff-type').value,desc:document.getElementById('ff-desc').value.trim(),amount,pay:document.getElementById('ff-pay').value,receipt:document.getElementById('ff-receipt').value.trim(),isPayment:false};
+  if(editingFeeId){rec.id=editingFeeId; fees=fees.map(f=>f.id===editingFeeId?rec:f);}
+  else{rec.id='F'+Date.now(); fees.push(rec);}
+  editingFeeId=null; saveFees(fees); closeModal('fee-modal'); refresh();
 }
-function openAddPayment() { refreshCaseSel('fp-case'); document.getElementById('fp-date').value=today(); ['fp-amount','fp-desc','fp-ref'].forEach(id=>document.getElementById(id).value=''); updatePaymentBalance(); openModal('payment-modal'); }
-function openAddPaymentFor(caseId) { openAddPayment(); const sel=document.getElementById('fp-case'); for(let i=0;i<sel.options.length;i++){if(sel.options[i].value===caseId){sel.selectedIndex=i;break;}} updatePaymentBalance(); }
+
+let editingPaymentId = null;
+
+function openAddPayment() {
+  editingPaymentId = null;
+  refreshCaseSel('fp-case');
+  document.getElementById('fp-date').value=today();
+  ['fp-amount','fp-desc','fp-ref'].forEach(id=>document.getElementById(id).value='');
+  document.querySelector('#payment-modal .modal-title span').textContent='📥 記錄收款沖銷';
+  document.getElementById('fp-case').disabled = false;
+  updatePaymentBalance(); openModal('payment-modal');
+}
+function openAddPaymentFor(caseId) {
+  openAddPayment();
+  const sel=document.getElementById('fp-case');
+  for(let i=0;i<sel.options.length;i++){if(sel.options[i].value===caseId){sel.selectedIndex=i;break;}}
+  updatePaymentBalance();
+}
 function updatePaymentBalance() {
   const caseId=document.getElementById('fp-case').value, inputAmt=Number(document.getElementById('fp-amount').value)||0;
   if(!caseId){document.getElementById('fp-balance-hint').textContent='';return;}
@@ -1097,10 +1210,47 @@ function updatePaymentBalance() {
 function savePayment() {
   const caseId=document.getElementById('fp-case').value, amount=Number(document.getElementById('fp-amount').value)||0;
   if(!caseId){alert('請選擇關聯案件');return;} if(!amount){alert('請輸入收款金額');return;}
-  const fees=loadFees();
-  fees.push({id:'P'+Date.now(),caseId,date:document.getElementById('fp-date').value,type:'收款沖銷',desc:document.getElementById('fp-desc').value.trim()||'借款方協商匯款',amount,pay:document.getElementById('fp-pay').value,receipt:document.getElementById('fp-ref').value.trim(),isPayment:true});
-  saveFees(fees); closeModal('payment-modal'); refresh();
+  let fees=loadFees();
+  const rec={caseId,date:document.getElementById('fp-date').value,type:'收款沖銷',desc:document.getElementById('fp-desc').value.trim()||'借款方協商匯款',amount,pay:document.getElementById('fp-pay').value,receipt:document.getElementById('fp-ref').value.trim(),isPayment:true};
+  if(editingPaymentId){rec.id=editingPaymentId; fees=fees.map(f=>f.id===editingPaymentId?rec:f);}
+  else{rec.id='P'+Date.now(); fees.push(rec);}
+  editingPaymentId=null; saveFees(fees); closeModal('payment-modal'); refresh();
 }
+
+function editFeeRecord(id) {
+  const f=loadFees().find(x=>x.id===id);
+  if(!f) return;
+  if(f.isPayment) {
+    // 開啟收款沖銷 modal
+    editingPaymentId = id;
+    refreshCaseSel('fp-case');
+    document.querySelector('#payment-modal .modal-title span').textContent='📥 編輯收款沖銷';
+    document.getElementById('fp-case').value=f.caseId;
+    document.getElementById('fp-case').disabled=true;
+    document.getElementById('fp-date').value=f.date;
+    document.getElementById('fp-amount').value=f.amount;
+    document.getElementById('fp-desc').value=f.desc||'';
+    document.getElementById('fp-pay').value=f.pay;
+    document.getElementById('fp-ref').value=f.receipt||'';
+    updatePaymentBalance();
+    openModal('payment-modal');
+  } else {
+    // 開啟代墊費用 modal
+    editingFeeId = id;
+    refreshCaseSel('ff-case');
+    document.querySelector('#fee-modal .modal-title span').textContent='編輯代墊費用';
+    document.getElementById('ff-case').value=f.caseId;
+    document.getElementById('ff-case').disabled=true;
+    document.getElementById('ff-date').value=f.date;
+    document.getElementById('ff-type').value=f.type;
+    document.getElementById('ff-amount').value=f.amount;
+    document.getElementById('ff-desc').value=f.desc||'';
+    document.getElementById('ff-pay').value=f.pay;
+    document.getElementById('ff-receipt').value=f.receipt||'';
+    openModal('fee-modal');
+  }
+}
+
 function deleteFee(id) {
   const f=loadFees().find(x=>x.id===id);
   if(!confirm(`確定刪除此${f&&f.isPayment?'收款':'費用'}記錄？`)) return;
@@ -1261,17 +1411,55 @@ function deleteReview(id) {
   if(document.getElementById('tab-reviews').classList.contains('active')) renderReviewsTab();
 }
 
+// ── 本金催回 ──────────────────────────────────────
+function openAddRecoveryFor(caseId) {
+  const cases = loadCases().filter(c=>c.stage!=='結案');
+  document.getElementById('rc-case').innerHTML = cases.map(c=>`<option value="${c.id}" ${c.id===caseId?'selected':''}>${c.id} ${c.name}</option>`).join('');
+  document.getElementById('rc-date').value = today();
+  document.getElementById('rc-amount').value = '';
+  document.getElementById('rc-notes').value = '';
+  updateRecoveryHint();
+  openModal('recovery-modal');
+}
+function updateRecoveryHint() {
+  const caseId = document.getElementById('rc-case').value;
+  const inputAmt = Number(document.getElementById('rc-amount').value)||0;
+  if (!caseId) { document.getElementById('rc-hint').textContent=''; return; }
+  const c = loadCases().find(x=>x.id===caseId);
+  const {recovered} = caseRecoverySummary(caseId);
+  const remaining = Math.max(0, Number(c?.amount||0)-recovered);
+  let hint = `目前剩餘本金：${fmtM(remaining)}`;
+  if (inputAmt>0) hint += `　→　催回後餘：${fmtM(Math.max(0,remaining-inputAmt))}`;
+  document.getElementById('rc-hint').textContent = hint;
+}
+function saveRecovery() {
+  const caseId = document.getElementById('rc-case').value;
+  const amount = Number(document.getElementById('rc-amount').value)||0;
+  if (!caseId) { alert('請選擇關聯案件'); return; }
+  if (!amount)  { alert('請輸入催回金額'); return; }
+  const recs = loadRecoveries();
+  recs.push({ id:'RC'+Date.now(), caseId, date:document.getElementById('rc-date').value, amount, notes:document.getElementById('rc-notes').value.trim() });
+  saveRecoveries(recs);
+  closeModal('recovery-modal'); refresh();
+}
+function deleteRecovery(id) {
+  if (!confirm('確定刪除此催回記錄？')) return;
+  saveRecoveries(loadRecoveries().filter(r=>r.id!==id)); refresh();
+}
+
 // ── 匯出 CSV ─────────────────────────────────────
 function exportExcel() {
   const cases=loadCases(), fees=loadFees(), reviews=loadReviews();
   const esc=v=>`"${String(v).replace(/"/g,'""')}"`;
 
-  const caseHeaders=['案件編號','登記日','借款人類型','借款人','身分證/統編','逾期金額','逾期天數','催收階段','委辦律師/機構','管轄法院','案件字號','共同發票人','代墊費用合計','已收回合計','淨墊款','債權憑證調閱次數','GD連結','備註'];
+  const caseHeaders=['案件編號','登記日','借款人類型','借款人','身分證/統編','逾期本金','利息','逾期天數','已催回本金','剩餘本金','催收階段','委辦律師/機構','管轄法院','案件字號','共同發票人','代墊費用合計','已收回費用','淨墊款','債權憑證調閱次數','GD連結','備註'];
   const caseRows=cases.map(c=>{
     const {totalOut,totalIn,net}=caseFeesSummary(c.id);
     const certCnt=reviews.filter(r=>r.caseId===c.id).length;
     const gList=(c.guarantors||[]).map(g=>`${g.type} ${g.name}${g.idno?'('+g.idno+')':''}`).join('；');
-    return [c.id,c.date,c.borrowerType||'自然人',c.name,c.idno||'',c.amount,calcDays(c.date),c.stage,c.lawyer||'',c.court||'',c.casenumber||'',gList,totalOut,totalIn,net,certCnt,c.gdlink||'',c.notes||''];
+    const {recovered:cRecovered}=caseRecoverySummary(c.id);
+    const cRemain=Math.max(0,Number(c.amount||0)-cRecovered);
+    return [c.id,c.date,c.borrowerType||'自然人',c.name,c.idno||'',c.amount,c.interest||0,calcDays(c.date),cRecovered,cRemain,c.stage,c.lawyer||'',c.court||'',c.casenumber||'',gList,totalOut,totalIn,net,certCnt,c.gdlink||'',c.notes||''];
   });
 
   const feeHeaders=['類型','日期','案件編號','借款人','費用類別','說明','代墊金額','收款金額','付款方式','憑證'];
@@ -1290,11 +1478,19 @@ function exportExcel() {
     });
   });
 
+  const recHeaders=['案件編號','借款人','催回日期','催回金額','備註'];
+  const recRows=loadRecoveries().map(r=>{
+    const c=cases.find(c=>c.id===r.caseId);
+    return [r.caseId,c?c.name:'',r.date,r.amount,r.notes||''];
+  });
+
   let csv='﻿';
   csv+='=== 案件清單 ===\n'+caseHeaders.map(esc).join(',')+'\n';
   caseRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
   csv+='\n=== 費用與收款明細 ===\n'+feeHeaders.map(esc).join(',')+'\n';
   feeRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
+  csv+='\n=== 本金催回明細 ===\n'+recHeaders.map(esc).join(',')+'\n';
+  recRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
   csv+='\n=== 債權憑證年度調閱記錄 ===\n'+revHeaders.map(esc).join(',')+'\n';
   revRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
 
@@ -1314,6 +1510,7 @@ document.querySelectorAll('.modal-overlay').forEach(el=>{
   el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('active');});
 });
 document.getElementById('fp-case').addEventListener('change',updatePaymentBalance);
+document.getElementById('rc-case').addEventListener('change',updateRecoveryHint);
 
 
 // ── Google Drive 文件清單 ──────────────────────────
