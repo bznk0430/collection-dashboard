@@ -828,6 +828,7 @@ function renderReviewsTab() {
             </div>
             <div style="display:flex;gap:6px;align-items:center;">
               <span class="tag-action">${r.action.split('（')[0]}</span>
+              <button class="btn btn-outline btn-sm" onclick="editReview('${r.id}')">編輯</button>
               <button class="btn btn-danger btn-sm" onclick="deleteReview('${r.id}')">刪除</button>
             </div>
           </div>
@@ -1161,8 +1162,10 @@ function onReviewCaseChange() {
 }
 
 function openAddReview(caseId='') {
+  editingReviewId = null;
   refreshReviewCaseSel('fr-case', caseId); fillYearSelect('fr-year');
   document.getElementById('review-modal-title').textContent='新增年度調閱記錄';
+  document.getElementById('fr-case').disabled = false;
   document.getElementById('fr-taxdate').value='';
   document.getElementById('fr-execfee').value='';
   document.getElementById('fr-notes').value='';
@@ -1173,11 +1176,12 @@ function openAddReview(caseId='') {
 }
 function openAddReviewFor(caseId) { openAddReview(caseId); }
 
+let editingReviewId = null;
+
 function saveReview() {
   const caseId=document.getElementById('fr-case').value;
   if(!caseId){alert('請選擇關聯案件');return;}
   const year=Number(document.getElementById('fr-year').value);
-  // 收集各人資料
   const container=document.getElementById('fr-persons-container');
   const blocks=container.querySelectorAll('.person-form-block');
   const persons=[...blocks].map((_,i)=>({
@@ -1190,26 +1194,67 @@ function saveReview() {
     asset: document.getElementById('fr-p-asset-'+i).value,
   }));
   const hasAsset = persons.some(p=>p.asset==='有');
-  const reviews=loadReviews();
   const rec={
-    id:'R'+Date.now(), caseId, year,
+    caseId, year,
     taxdate:document.getElementById('fr-taxdate').value,
-    persons,
-    hasAsset,
+    persons, hasAsset,
     action:document.getElementById('fr-action').value,
     execfee:Number(document.getElementById('fr-execfee').value)||0,
     notes:document.getElementById('fr-notes').value.trim(),
   };
-  reviews.push(rec);
-  if(rec.action==='聲請再執行'&&rec.execfee>0) {
-    const firstDate=persons.find(p=>p.reviewdate)?.reviewdate||today();
-    const fees=loadFees();
-    fees.push({id:'F'+Date.now(),caseId,date:firstDate,type:'執行費',desc:`${year}年度再執行費用`,amount:rec.execfee,pay:'公司代墊',receipt:'',isPayment:false});
-    saveFees(fees);
+  let reviews=loadReviews();
+  const isEdit = !!editingReviewId;
+  if (isEdit) {
+    rec.id = editingReviewId;
+    reviews = reviews.map(r=>r.id===editingReviewId ? rec : r);
+  } else {
+    rec.id = 'R'+Date.now();
+    reviews.push(rec);
+    if(rec.action==='聲請再執行'&&rec.execfee>0) {
+      const firstDate=persons.find(p=>p.reviewdate)?.reviewdate||today();
+      const fees=loadFees();
+      fees.push({id:'F'+Date.now(),caseId,date:firstDate,type:'執行費',desc:`${year}年度再執行費用`,amount:rec.execfee,pay:'公司代墊',receipt:'',isPayment:false});
+      saveFees(fees);
+    }
   }
-  saveReviews(reviews); closeModal('review-modal'); refresh();
-  alert(`✅ ${year} 年度調閱記錄已儲存${rec.action==='聲請再執行'&&rec.execfee>0?'\n再執行費用已自動記錄至費用明細。':''}`)
+  saveReviews(reviews);
+  editingReviewId = null;
+  closeModal('review-modal'); refresh();
+  alert(`✅ ${year} 年度調閱記錄已${isEdit?'更新':'儲存'}`)
 }
+
+function editReview(id) {
+  const reviews = loadReviews();
+  const r = reviews.find(x=>x.id===id);
+  if (!r) return;
+  editingReviewId = id;
+  // 開啟 modal 並填入資料
+  refreshReviewCaseSel('fr-case', r.caseId); fillYearSelect('fr-year');
+  document.getElementById('review-modal-title').textContent='編輯年度調閱記錄';
+  document.getElementById('fr-case').value = r.caseId;
+  document.getElementById('fr-case').disabled = true; // 編輯時不允許換案件
+  document.getElementById('fr-year').value = r.year;
+  document.getElementById('fr-taxdate').value = r.taxdate||'';
+  document.getElementById('fr-action').value = r.action;
+  document.getElementById('fr-execfee').value = r.execfee||'';
+  document.getElementById('fr-notes').value = r.notes||'';
+  // 重建 persons 表單並填入已存資料
+  buildPersonsForm(r.caseId);
+  if (r.persons && r.persons.length) {
+    r.persons.forEach((p,i)=>{
+      const dateEl = document.getElementById('fr-p-date-'+i);
+      const assetEl = document.getElementById('fr-p-asset-'+i);
+      const propEl  = document.getElementById('fr-p-property-'+i);
+      const incEl   = document.getElementById('fr-p-income-'+i);
+      if (dateEl)  dateEl.value  = p.reviewdate||'';
+      if (assetEl) assetEl.value = p.asset||'無';
+      if (propEl)  propEl.value  = p.property||'';
+      if (incEl)   incEl.value   = p.income||'';
+    });
+  }
+  openModal('review-modal');
+}
+
 function deleteReview(id) {
   if(!confirm('確定刪除此年度調閱記錄？')) return;
   saveReviews(loadReviews().filter(r=>r.id!==id)); refresh();
