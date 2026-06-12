@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>逾期催收案件管理系統</title>
-<!-- Firebase compat SDKs (CDN, no npm needed) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
@@ -29,6 +28,7 @@
   .stat-card.orange { border-color: #dd6b20; }
   .stat-card.green { border-color: #38a169; }
   .stat-card.teal { border-color: #319795; }
+  .stat-card.purple { border-color: #6b46c1; }
   .stat-label { font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
   .stat-value { font-size: 22px; font-weight: 700; margin-top: 4px; color: #1a202c; }
   .stat-sub { font-size: 11px; color: #a0aec0; margin-top: 2px; }
@@ -44,6 +44,8 @@
   .btn-success:hover { background: #2f855a; }
   .btn-teal { background: #319795; color: white; }
   .btn-teal:hover { background: #2c7a7b; }
+  .btn-purple { background: #6b46c1; color: white; }
+  .btn-purple:hover { background: #553c9a; }
   .btn-outline { background: white; border: 1px solid #e2e8f0; color: #4a5568; }
   .btn-outline:hover { background: #f7fafc; }
   .btn-danger { background: #e53e3e; color: white; }
@@ -68,9 +70,10 @@
   .badge-催告 { background: #ebf8ff; color: #2b6cb0; }
   .badge-存證信函 { background: #fef3c7; color: #92400e; }
   .badge-律師函 { background: #fed7aa; color: #9a3412; }
-  .badge-支付命令 { background: #fce7f3; color: #9d174d; }
+  .badge-本票裁定 { background: #fce7f3; color: #9d174d; }
   .badge-訴訟 { background: #ede9fe; color: #5b21b6; }
   .badge-強制執行 { background: #fee2e2; color: #991b1b; }
+  .badge-債權憑證 { background: #e9d8fd; color: #44337a; }
   .badge-結案 { background: #d1fae5; color: #065f46; }
 
   .table-wrapper { overflow-x: auto; }
@@ -93,7 +96,6 @@
   .fee-table .amount-in { font-weight: 600; color: #276749; }
   .fee-table .total-row td { font-weight: 700; background: #edf2f7; }
 
-  /* 費用沖銷看板 */
   .offset-summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
   .offset-box { padding: 14px 20px; text-align: center; }
   .offset-box:not(:last-child) { border-right: 1px solid #e2e8f0; }
@@ -104,7 +106,6 @@
   .offset-box.net .value { color: #dd6b20; }
   .offset-box.net { background: #fffbeb; }
 
-  /* 收款沖銷記錄行樣式 */
   .row-payment { background: #f0fff4 !important; }
   .row-payment:hover td { background: #e6ffed !important; }
   .row-fee { background: white; }
@@ -115,7 +116,6 @@
   .net-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
   .net-badge.positive { background: #fff5f5; color: #c53030; }
   .net-badge.zero { background: #f0fff4; color: #276749; }
-  .net-badge.negative { background: #ebf8ff; color: #2b6cb0; }
 
   .gd-note { background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 8px; padding: 12px 16px; font-size: 12px; color: #2b6cb0; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
 
@@ -125,65 +125,55 @@
   .detail-item .value { font-size: 14px; font-weight: 600; color: #1a202c; margin-top: 3px; }
 
   .stage-progress { display: flex; gap: 0; margin-bottom: 20px; overflow: hidden; border-radius: 8px; }
-  .stage-step { flex: 1; padding: 8px 4px; text-align: center; font-size: 10px; font-weight: 600; background: #e2e8f0; color: #a0aec0; transition: all 0.2s; position: relative; }
+  .stage-step { flex: 1; padding: 7px 3px; text-align: center; font-size: 9px; font-weight: 600; background: #e2e8f0; color: #a0aec0; transition: all 0.2s; position: relative; }
   .stage-step.done { background: #3182ce; color: white; }
   .stage-step.current { background: #63b3ed; color: white; }
-  .stage-step:not(:last-child)::after { content: ''; position: absolute; right: -6px; top: 0; border-top: 22px solid transparent; border-bottom: 22px solid transparent; z-index: 1; }
+  .stage-step.current-cert { background: #6b46c1; color: white; }
+  .stage-step:not(:last-child)::after { content: ''; position: absolute; right: -6px; top: 0; border-top: 21px solid transparent; border-bottom: 21px solid transparent; z-index: 1; }
   .stage-step.done::after { border-left: 7px solid #3182ce; }
   .stage-step.current::after { border-left: 7px solid #63b3ed; }
-  .stage-step:not(.done):not(.current)::after { border-left: 7px solid #e2e8f0; }
+  .stage-step.current-cert::after { border-left: 7px solid #6b46c1; }
+  .stage-step:not(.done):not(.current):not(.current-cert)::after { border-left: 7px solid #e2e8f0; }
 
   .empty-state { text-align: center; padding: 40px; color: #a0aec0; }
   .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
 
-  .divider { border: none; border-top: 2px dashed #e2e8f0; margin: 16px 0; }
+  /* 債權憑證年度調閱區塊 */
+  .cert-section { background: #faf5ff; border: 1px solid #d6bcfa; border-radius: 10px; padding: 16px 20px; margin-bottom: 16px; }
+  .cert-section-title { font-size: 13px; font-weight: 700; color: #44337a; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+  .review-card { background: white; border: 1px solid #e9d8fd; border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; }
+  .review-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .review-year { font-size: 15px; font-weight: 700; color: #44337a; }
+  .review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .review-item { font-size: 12px; }
+  .review-item .rlabel { color: #718096; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.3px; }
+  .review-item .rvalue { color: #2d3748; margin-top: 2px; font-weight: 500; }
+  .tag-asset-yes { background: #fff5f5; color: #c53030; border: 1px solid #fed7d7; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .tag-asset-no  { background: #f0fff4; color: #276749; border: 1px solid #c6f6d5; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .tag-action { background: #e9d8fd; color: #44337a; border: 1px solid #d6bcfa; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; }
 
-  @media print { .btn, .header-actions, .filter-bar, .tab-bar { display: none; } }
-
-  /* ── Firebase Auth 登入畫面 ── */
-  #auth-wall {
-    position: fixed; inset: 0; z-index: 9999;
-    background: linear-gradient(135deg, #1a365d 0%, #2b6cb0 100%);
-    display: flex; align-items: center; justify-content: center;
-  }
+  /* Firebase Auth */
+  #auth-wall { position: fixed; inset: 0; z-index: 9999; background: linear-gradient(135deg, #1a365d 0%, #2b6cb0 100%); display: flex; align-items: center; justify-content: center; }
   #auth-wall.hidden { display: none; }
-  .login-card {
-    background: white; border-radius: 16px; padding: 40px 44px;
-    width: 380px; text-align: center;
-    box-shadow: 0 24px 64px rgba(0,0,0,0.25);
-  }
+  .login-card { background: white; border-radius: 16px; padding: 40px 44px; width: 380px; text-align: center; box-shadow: 0 24px 64px rgba(0,0,0,0.25); }
   .login-logo { font-size: 40px; margin-bottom: 12px; }
   .login-title { font-size: 20px; font-weight: 700; color: #1a202c; margin-bottom: 4px; }
   .login-sub { font-size: 13px; color: #718096; margin-bottom: 28px; }
-  .login-btn {
-    display: flex; align-items: center; justify-content: center; gap: 10px;
-    width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;
-    background: white; font-size: 14px; font-weight: 600; color: #2d3748;
-    cursor: pointer; transition: all 0.15s;
-  }
+  .login-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; background: white; font-size: 14px; font-weight: 600; color: #2d3748; cursor: pointer; transition: all 0.15s; }
   .login-btn:hover { background: #f7fafc; border-color: #3182ce; }
   .login-btn img { width: 20px; height: 20px; }
   .login-err { margin-top: 14px; font-size: 12px; color: #e53e3e; display: none; }
   .login-loading { margin-top: 14px; font-size: 12px; color: #718096; display: none; }
-
-  /* 右上角使用者資訊 */
-  .user-chip {
-    display: flex; align-items: center; gap: 8px;
-    background: rgba(255,255,255,0.15); border-radius: 20px;
-    padding: 5px 12px 5px 6px; font-size: 12px; color: white;
-  }
+  .user-chip { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.15); border-radius: 20px; padding: 5px 12px 5px 6px; font-size: 12px; color: white; }
   .user-chip img { width: 24px; height: 24px; border-radius: 50%; }
-  .user-chip .logout-btn {
-    background: rgba(255,255,255,0.2); border: none; color: white;
-    border-radius: 10px; padding: 2px 8px; font-size: 11px; cursor: pointer;
-    margin-left: 4px;
-  }
+  .user-chip .logout-btn { background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 10px; padding: 2px 8px; font-size: 11px; cursor: pointer; margin-left: 4px; }
   .user-chip .logout-btn:hover { background: rgba(255,255,255,0.35); }
+
+  @media print { .btn, .header-actions, .filter-bar, .tab-bar { display: none; } }
 </style>
 </head>
 <body>
 
-<!-- ── 登入牆（未驗證前覆蓋整個畫面）── -->
 <div id="auth-wall">
   <div class="login-card">
     <div class="login-logo">📋</div>
@@ -232,6 +222,7 @@
     <div class="tab-bar">
       <div class="tab active" onclick="switchTab('cases')">📁 案件清單</div>
       <div class="tab" onclick="switchTab('fees')">💳 費用 &amp; 沖銷明細</div>
+      <div class="tab" onclick="switchTab('reviews')">📅 債權憑證年度調閱</div>
       <div class="tab" onclick="switchTab('guide')">📌 使用說明</div>
     </div>
 
@@ -242,11 +233,10 @@
         <select id="filter-stage" onchange="renderTable()">
           <option value="">全部階段</option>
           <option>催告</option><option>存證信函</option><option>律師函</option>
-          <option>支付命令</option><option>訴訟</option><option>強制執行</option><option>結案</option>
+          <option>本票裁定</option><option>訴訟</option><option>強制執行</option>
+          <option>債權憑證</option><option>結案</option>
         </select>
-        <select id="filter-court" onchange="renderTable()">
-          <option value="">全部法院</option>
-        </select>
+        <select id="filter-court" onchange="renderTable()"><option value="">全部法院</option></select>
         <select id="sort-by" onchange="renderTable()">
           <option value="date-desc">依登記日（新→舊）</option>
           <option value="date-asc">依登記日（舊→新）</option>
@@ -256,22 +246,20 @@
       </div>
       <div class="table-wrapper">
         <table style="width:100%;border-collapse:collapse;min-width:960px;">
-          <thead>
-            <tr style="background:#f7fafc;">
-              <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">案件編號</th>
-              <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">借款人</th>
-              <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">逾期金額</th>
-              <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">催收階段</th>
-              <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">委辦律師/機構</th>
-              <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">管轄法院</th>
-              <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">代墊費用</th>
-              <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">已收回</th>
-              <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">淨墊款</th>
-              <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">登記日</th>
-              <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">GD</th>
-              <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">操作</th>
-            </tr>
-          </thead>
+          <thead><tr style="background:#f7fafc;">
+            <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">案件編號</th>
+            <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">借款人</th>
+            <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">逾期金額</th>
+            <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">催收階段</th>
+            <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">委辦律師/機構</th>
+            <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">管轄法院</th>
+            <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">代墊費用</th>
+            <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">已收回</th>
+            <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">淨墊款</th>
+            <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">登記日</th>
+            <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">GD</th>
+            <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#718096;border-bottom:2px solid #e2e8f0;white-space:nowrap;">操作</th>
+          </tr></thead>
           <tbody id="case-tbody"></tbody>
         </table>
       </div>
@@ -282,11 +270,8 @@
     <!-- 費用 & 沖銷明細 -->
     <div class="tab-content" id="tab-fees">
       <div id="offset-summary-box"></div>
-
       <div class="filter-bar">
-        <select id="fee-filter-case" onchange="renderFeeTable()">
-          <option value="">全部案件</option>
-        </select>
+        <select id="fee-filter-case" onchange="renderFeeTable()"><option value="">全部案件</option></select>
         <select id="fee-filter-type" onchange="renderFeeTable()">
           <option value="">全部類型</option>
           <optgroup label="── 代墊費用 ──">
@@ -303,31 +288,34 @@
           <button class="btn btn-primary btn-sm" onclick="openAddFee()">＋ 新增代墊費用</button>
         </div>
       </div>
-
-      <table class="fee-table" id="fee-table-el">
-        <thead>
-          <tr>
-            <th>日期</th>
-            <th>案件</th>
-            <th>借款人</th>
-            <th>類型</th>
-            <th>說明</th>
-            <th>代墊金額</th>
-            <th>收回金額</th>
-            <th>付款/收款方式</th>
-            <th>憑證</th>
-            <th>操作</th>
-          </tr>
-        </thead>
+      <table class="fee-table">
+        <thead><tr><th>日期</th><th>案件</th><th>借款人</th><th>類型</th><th>說明</th><th>代墊金額</th><th>收回金額</th><th>付款/收款方式</th><th>憑證</th><th>操作</th></tr></thead>
         <tbody id="fee-tbody"></tbody>
         <tfoot id="fee-tfoot"></tfoot>
       </table>
       <div id="fee-empty" class="empty-state" style="display:none;"><div class="icon">💸</div><div>尚未記錄任何費用</div></div>
     </div>
 
+    <!-- 債權憑證年度調閱 Tab -->
+    <div class="tab-content" id="tab-reviews">
+      <div class="filter-bar">
+        <select id="review-filter-case" onchange="renderReviewsTab()"><option value="">全部債權憑證案件</option></select>
+        <select id="review-filter-year" onchange="renderReviewsTab()"><option value="">全部年度</option></select>
+        <div style="margin-left:auto;">
+          <button class="btn btn-purple btn-sm" onclick="openAddReview()">＋ 新增年度調閱記錄</button>
+        </div>
+      </div>
+      <div id="reviews-content"></div>
+      <div id="reviews-empty" class="empty-state" style="display:none;">
+        <div class="icon">📅</div>
+        <div>尚無債權憑證年度調閱記錄</div>
+        <div style="font-size:12px;margin-top:8px;">強制執行後核發債權憑證的案件，每年綜所稅申報完成後新增調閱記錄。</div>
+      </div>
+    </div>
+
     <!-- 使用說明 -->
     <div class="tab-content" id="tab-guide">
-      <div style="max-width:640px;line-height:1.8;color:#4a5568;">
+      <div style="max-width:680px;line-height:1.8;color:#4a5568;">
         <h3 style="font-size:15px;font-weight:700;margin-bottom:12px;color:#1a202c;">📌 系統使用說明</h3>
 
         <h4 style="font-size:13px;font-weight:700;margin-bottom:8px;color:#2d3748;">催收階段定義</h4>
@@ -336,44 +324,53 @@
           <tr><td style="padding:8px;border:1px solid #e2e8f0;"><span class="badge badge-催告">催告</span></td><td style="padding:8px;border:1px solid #e2e8f0;">電話/書面催收</td><td style="padding:8px;border:1px solid #e2e8f0;">委外催收費</td></tr>
           <tr><td style="padding:8px;border:1px solid #e2e8f0;"><span class="badge badge-存證信函">存證信函</span></td><td style="padding:8px;border:1px solid #e2e8f0;">郵局存證信函</td><td style="padding:8px;border:1px solid #e2e8f0;">存證信函費、律師費</td></tr>
           <tr><td style="padding:8px;border:1px solid #e2e8f0;"><span class="badge badge-律師函">律師函</span></td><td style="padding:8px;border:1px solid #e2e8f0;">律師事務所發函</td><td style="padding:8px;border:1px solid #e2e8f0;">律師費</td></tr>
-          <tr><td style="padding:8px;border:1px solid #e2e8f0;"><span class="badge badge-支付命令">支付命令</span></td><td style="padding:8px;border:1px solid #e2e8f0;">向法院聲請</td><td style="padding:8px;border:1px solid #e2e8f0;">訴訟費、律師費</td></tr>
+          <tr><td style="padding:8px;border:1px solid #e2e8f0;"><span class="badge badge-本票裁定">本票裁定</span></td><td style="padding:8px;border:1px solid #e2e8f0;">向法院聲請本票裁定</td><td style="padding:8px;border:1px solid #e2e8f0;">訴訟費、律師費</td></tr>
           <tr><td style="padding:8px;border:1px solid #e2e8f0;"><span class="badge badge-訴訟">訴訟</span></td><td style="padding:8px;border:1px solid #e2e8f0;">正式提起民事訴訟</td><td style="padding:8px;border:1px solid #e2e8f0;">訴訟費、律師費、查址費</td></tr>
           <tr><td style="padding:8px;border:1px solid #e2e8f0;"><span class="badge badge-強制執行">強制執行</span></td><td style="padding:8px;border:1px solid #e2e8f0;">取得執行名義後執行</td><td style="padding:8px;border:1px solid #e2e8f0;">執行費、查址費</td></tr>
-          <tr><td style="padding:8px;border:1px solid #e2e8f0;"><span class="badge badge-結案">結案</span></td><td style="padding:8px;border:1px solid #e2e8f0;">收款完成或停止催收</td><td style="padding:8px;border:1px solid #e2e8f0;">—</td></tr>
+          <tr style="background:#faf5ff;"><td style="padding:8px;border:1px solid #e2e8f0;"><span class="badge badge-債權憑證">債權憑證</span></td><td style="padding:8px;border:1px solid #e2e8f0;">強制執行未果，法院核發債權憑證，每年調閱財產所得清冊持續監控</td><td style="padding:8px;border:1px solid #e2e8f0;">年度查址費、再執行費</td></tr>
+          <tr><td style="padding:8px;border:1px solid #e2e8f0;"><span class="badge badge-結案">結案</span></td><td style="padding:8px;border:1px solid #e2e8f0;">催收成功款項收回，或停止催收</td><td style="padding:8px;border:1px solid #e2e8f0;">—</td></tr>
         </table>
 
-        <h4 style="font-size:13px;font-weight:700;margin-bottom:8px;color:#2d3748;">收款沖銷說明</h4>
-        <div style="background:#f0fff4;border:1px solid #c6f6d5;border-radius:8px;padding:14px 16px;margin-bottom:20px;font-size:13px;">
-          <p style="margin-bottom:8px;">當借款方協商並匯入部分金額時，使用「<strong>記錄收款沖銷</strong>」功能記錄。系統會自動計算：</p>
-          <p>📤 <strong>代墊費用</strong>（紅色）— 公司已墊付的費用總額</p>
-          <p>📥 <strong>已收回</strong>（綠色）— 借款方已匯回的金額</p>
-          <p>⚖️ <strong>淨墊款</strong>（橘色）— 目前仍需追討的費用淨額</p>
-          <p style="margin-top:8px;color:#718096;font-size:12px;">收款沖銷與代墊費用記錄在同一張明細表，以綠色底色區隔，方便核對。</p>
+        <h4 style="font-size:13px;font-weight:700;margin-bottom:8px;color:#44337a;">📅 債權憑證年度調閱說明</h4>
+        <div style="background:#faf5ff;border:1px solid #d6bcfa;border-radius:8px;padding:14px 16px;margin-bottom:20px;font-size:13px;">
+          <p style="margin-bottom:8px;">強制執行後若債務人名下無資產，法院會核發<strong>債權憑證</strong>。平台每年於綜所稅申報完成後調閱債務人財產及所得清冊，記錄是否有可再執行的資產。</p>
+          <p style="margin-bottom:4px;">🗂 在「<strong>債權憑證年度調閱</strong>」頁籤新增每年的調閱記錄，包含：</p>
+          <p>・ 調閱年度與日期</p>
+          <p>・ 財產清冊 / 所得清冊結果摘要</p>
+          <p>・ 有無發現可執行資產</p>
+          <p>・ 後續處置決定（繼續監控 / 聲請再執行 / 結案）</p>
+          <p style="margin-top:8px;">若決定聲請再執行，可同步在費用頁籤記錄再執行的代墊費用。</p>
         </div>
 
-        <h4 style="font-size:13px;font-weight:700;margin-bottom:8px;color:#2d3748;">GD 雲端資料夾連結</h4>
-        <p style="margin-bottom:16px;font-size:13px;">每個案件可貼入 Google Drive 資料夾連結，點擊 📂 圖示即可直接開啟。</p>
+        <h4 style="font-size:13px;font-weight:700;margin-bottom:8px;color:#2d3748;">強制執行結束的兩種結果</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+          <div style="background:#f0fff4;border:1px solid #c6f6d5;border-radius:8px;padding:12px 14px;font-size:13px;">
+            <div style="font-weight:700;color:#276749;margin-bottom:6px;">✅ 催收成功 → 結案</div>
+            <div style="color:#4a5568;">收回款項後，將案件階段改為「結案」。</div>
+          </div>
+          <div style="background:#faf5ff;border:1px solid #d6bcfa;border-radius:8px;padding:12px 14px;font-size:13px;">
+            <div style="font-weight:700;color:#44337a;margin-bottom:6px;">📄 催收未果 → 債權憑證</div>
+            <div style="color:#4a5568;">將案件階段改為「債權憑證」，後續每年新增調閱記錄追蹤。</div>
+          </div>
+        </div>
 
         <h4 style="font-size:13px;font-weight:700;margin-bottom:8px;color:#2d3748;">資料儲存與備份</h4>
-        <p style="font-size:13px;">資料存於瀏覽器本地端，重新開啟儀表板時會保留。建議定期點擊「匯出 Excel」備份，匯出檔案包含案件清單、費用明細、收款記錄三個區塊。</p>
+        <p style="font-size:13px;">資料存於瀏覽器本地端。建議定期點擊「匯出 Excel」備份，匯出檔案包含案件清單、費用明細、收款記錄、年度調閱記錄四個區塊。</p>
       </div>
     </div>
   </div>
 </div>
 
-<!-- 新增/編輯案件 Modal -->
+<!-- 案件 Modal -->
 <div class="modal-overlay" id="case-modal">
   <div class="modal">
-    <div class="modal-title">
-      <span id="modal-title-text">新增催收案件</span>
-      <button class="modal-close" onclick="closeModal('case-modal')">✕</button>
-    </div>
+    <div class="modal-title"><span id="modal-title-text">新增催收案件</span><button class="modal-close" onclick="closeModal('case-modal')">✕</button></div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">案件編號</label><input class="form-control" id="f-id" placeholder="自動生成或手動輸入" /></div>
       <div class="form-group"><label class="form-label">登記日期</label><input class="form-control" type="date" id="f-date" /></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">借款人姓名</label><input class="form-control" id="f-name" placeholder="借款人全名" /></div>
+      <div class="form-group"><label class="form-label">借款人姓名</label><input class="form-control" id="f-name" /></div>
       <div class="form-group"><label class="form-label">身分證字號</label><input class="form-control" id="f-idno" placeholder="A123456789" /></div>
     </div>
     <div class="form-row">
@@ -384,17 +381,18 @@
       <div class="form-group"><label class="form-label">催收階段</label>
         <select class="form-control" id="f-stage">
           <option>催告</option><option>存證信函</option><option>律師函</option>
-          <option>支付命令</option><option>訴訟</option><option>強制執行</option><option>結案</option>
+          <option>本票裁定</option><option>訴訟</option><option>強制執行</option>
+          <option>債權憑證</option><option>結案</option>
         </select>
       </div>
       <div class="form-group"><label class="form-label">管轄法院</label><input class="form-control" id="f-court" placeholder="例：臺北地方法院" /></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">委辦律師/機構</label><input class="form-control" id="f-lawyer" placeholder="律師或催收機構名稱" /></div>
-      <div class="form-group"><label class="form-label">案件字號</label><input class="form-control" id="f-casenumber" placeholder="例：113年度司促字第12345號" /></div>
+      <div class="form-group"><label class="form-label">委辦律師/機構</label><input class="form-control" id="f-lawyer" /></div>
+      <div class="form-group"><label class="form-label">案件字號</label><input class="form-control" id="f-casenumber" placeholder="例：114年度執字第12345號" /></div>
     </div>
     <div class="form-group"><label class="form-label">Google Drive 資料夾連結</label><input class="form-control" id="f-gdlink" placeholder="https://drive.google.com/drive/folders/..." /></div>
-    <div class="form-group"><label class="form-label">案件備註</label><textarea class="form-control" id="f-notes" rows="3" placeholder="記錄重要進度、下一步行動、特殊情況..."></textarea></div>
+    <div class="form-group"><label class="form-label">案件備註</label><textarea class="form-control" id="f-notes" rows="3"></textarea></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
       <button class="btn btn-outline" onclick="closeModal('case-modal')">取消</button>
       <button class="btn btn-primary" onclick="saveCase()">儲存案件</button>
@@ -404,22 +402,16 @@
 
 <!-- 案件詳情 Modal -->
 <div class="modal-overlay" id="detail-modal">
-  <div class="modal" style="width:720px;">
-    <div class="modal-title">
-      <span id="detail-title">案件詳情</span>
-      <button class="modal-close" onclick="closeModal('detail-modal')">✕</button>
-    </div>
+  <div class="modal" style="width:740px;">
+    <div class="modal-title"><span id="detail-title">案件詳情</span><button class="modal-close" onclick="closeModal('detail-modal')">✕</button></div>
     <div id="detail-content"></div>
   </div>
 </div>
 
-<!-- 新增代墊費用 Modal -->
+<!-- 代墊費用 Modal -->
 <div class="modal-overlay" id="fee-modal">
   <div class="modal" style="width:500px;">
-    <div class="modal-title">
-      <span>新增代墊費用</span>
-      <button class="modal-close" onclick="closeModal('fee-modal')">✕</button>
-    </div>
+    <div class="modal-title"><span>新增代墊費用</span><button class="modal-close" onclick="closeModal('fee-modal')">✕</button></div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">關聯案件</label><select class="form-control" id="ff-case"></select></div>
       <div class="form-group"><label class="form-label">費用日期</label><input class="form-control" type="date" id="ff-date" /></div>
@@ -434,12 +426,10 @@
       </div>
       <div class="form-group"><label class="form-label">金額（元）</label><input class="form-control" type="number" id="ff-amount" placeholder="0" /></div>
     </div>
-    <div class="form-group"><label class="form-label">費用說明</label><input class="form-control" id="ff-desc" placeholder="例：委託王大律師發律師函" /></div>
+    <div class="form-group"><label class="form-label">費用說明</label><input class="form-control" id="ff-desc" /></div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">付款方式</label>
-        <select class="form-control" id="ff-pay">
-          <option>公司代墊</option><option>匯款</option><option>現金</option><option>信用卡</option>
-        </select>
+        <select class="form-control" id="ff-pay"><option>公司代墊</option><option>匯款</option><option>現金</option><option>信用卡</option></select>
       </div>
       <div class="form-group"><label class="form-label">憑證/發票號碼</label><input class="form-control" id="ff-receipt" placeholder="選填" /></div>
     </div>
@@ -450,18 +440,15 @@
   </div>
 </div>
 
-<!-- 記錄收款沖銷 Modal -->
+<!-- 收款沖銷 Modal -->
 <div class="modal-overlay" id="payment-modal">
   <div class="modal" style="width:500px;">
-    <div class="modal-title">
-      <span>📥 記錄收款沖銷</span>
-      <button class="modal-close" onclick="closeModal('payment-modal')">✕</button>
-    </div>
+    <div class="modal-title"><span>📥 記錄收款沖銷</span><button class="modal-close" onclick="closeModal('payment-modal')">✕</button></div>
     <div style="background:#f0fff4;border:1px solid #c6f6d5;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#276749;">
       ✅ 記錄借款方協商後匯入的金額，系統將自動從累計代墊費用中扣除，計算淨墊款餘額。
     </div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">關聯案件</label><select class="form-control" id="fp-case" onchange="updatePaymentBalance()"></select></div>
+      <div class="form-group"><label class="form-label">關聯案件</label><select class="form-control" id="fp-case"></select></div>
       <div class="form-group"><label class="form-label">收款日期</label><input class="form-control" type="date" id="fp-date" /></div>
     </div>
     <div class="form-group">
@@ -472,9 +459,7 @@
     <div class="form-group"><label class="form-label">收款說明</label><input class="form-control" id="fp-desc" placeholder="例：借款方協商匯款第一期" /></div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">收款方式</label>
-        <select class="form-control" id="fp-pay">
-          <option>銀行匯款</option><option>現金</option><option>法院代收</option><option>其他</option>
-        </select>
+        <select class="form-control" id="fp-pay"><option>銀行匯款</option><option>現金</option><option>法院代收</option><option>其他</option></select>
       </div>
       <div class="form-group"><label class="form-label">匯款帳號末五碼</label><input class="form-control" id="fp-ref" placeholder="選填，供核對" /></div>
     </div>
@@ -485,142 +470,160 @@
   </div>
 </div>
 
+<!-- 年度調閱記錄 Modal -->
+<div class="modal-overlay" id="review-modal">
+  <div class="modal" style="width:560px;">
+    <div class="modal-title"><span id="review-modal-title">新增年度調閱記錄</span><button class="modal-close" onclick="closeModal('review-modal')">✕</button></div>
+    <div style="background:#faf5ff;border:1px solid #d6bcfa;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#44337a;">
+      📅 記錄本年度綜所稅申報完成後調閱債務人財產及所得清冊的結果。
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">關聯案件</label><select class="form-control" id="fr-case"></select></div>
+      <div class="form-group"><label class="form-label">調閱年度</label>
+        <select class="form-control" id="fr-year"></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">綜所稅申報完成日</label><input class="form-control" type="date" id="fr-taxdate" /></div>
+      <div class="form-group"><label class="form-label">財產/所得調閱日</label><input class="form-control" type="date" id="fr-reviewdate" /></div>
+    </div>
+    <div class="form-group"><label class="form-label">財產清冊結果摘要</label><textarea class="form-control" id="fr-property" rows="2" placeholder="例：名下無不動產、無車輛登記"></textarea></div>
+    <div class="form-group"><label class="form-label">所得清冊結果摘要</label><textarea class="form-control" id="fr-income" rows="2" placeholder="例：全年所得 0 元，無薪資收入"></textarea></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">有無可執行資產</label>
+        <select class="form-control" id="fr-asset">
+          <option value="無">無可執行資產</option>
+          <option value="有">有可執行資產</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">後續處置決定</label>
+        <select class="form-control" id="fr-action">
+          <option>繼續監控（明年再調閱）</option>
+          <option>聲請再執行</option>
+          <option>結案（停止催收）</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">再執行費用（元，選填）</label><input class="form-control" type="number" id="fr-execfee" placeholder="0，若本次聲請再執行才需填入" /></div>
+    <div class="form-group"><label class="form-label">備註</label><textarea class="form-control" id="fr-notes" rows="2" placeholder="其他補充說明"></textarea></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+      <button class="btn btn-outline" onclick="closeModal('review-modal')">取消</button>
+      <button class="btn btn-purple" onclick="saveReview()">儲存記錄</button>
+    </div>
+  </div>
+</div>
+
 <script>
-// ── 資料層 ────────────────────────────────────────────
-const CASES_KEY = 'bznk_cases_v1';
-const FEES_KEY  = 'bznk_fees_v2';   // v2 包含 isPayment 欄位
+// ── 資料層 ────────────────────────────────────────
+const CASES_KEY   = 'bznk_cases_v1';
+const FEES_KEY    = 'bznk_fees_v2';
+const REVIEWS_KEY = 'bznk_reviews_v1';
 
-function loadCases() { try { return JSON.parse(localStorage.getItem(CASES_KEY) || '[]'); } catch(e) { return []; } }
-function saveCases(d) { localStorage.setItem(CASES_KEY, JSON.stringify(d)); }
-function loadFees()  { try { return JSON.parse(localStorage.getItem(FEES_KEY)  || '[]'); } catch(e) { return []; } }
-function saveFees(d) { localStorage.setItem(FEES_KEY, JSON.stringify(d)); }
+function loadCases()   { try { return JSON.parse(localStorage.getItem(CASES_KEY)   || '[]'); } catch(e) { return []; } }
+function saveCases(d)  { localStorage.setItem(CASES_KEY,   JSON.stringify(d)); }
+function loadFees()    { try { return JSON.parse(localStorage.getItem(FEES_KEY)    || '[]'); } catch(e) { return []; } }
+function saveFees(d)   { localStorage.setItem(FEES_KEY,    JSON.stringify(d)); }
+function loadReviews() { try { return JSON.parse(localStorage.getItem(REVIEWS_KEY) || '[]'); } catch(e) { return []; } }
+function saveReviews(d){ localStorage.setItem(REVIEWS_KEY, JSON.stringify(d)); }
 
-// 案件費用摘要（代墊 / 收回 / 淨額）
 function caseFeesSummary(caseId) {
   const fees = loadFees().filter(f => f.caseId === caseId);
-  const totalOut = fees.filter(f => !f.isPayment).reduce((s,f) => s + Number(f.amount||0), 0);
-  const totalIn  = fees.filter(f =>  f.isPayment).reduce((s,f) => s + Number(f.amount||0), 0);
+  const totalOut = fees.filter(f => !f.isPayment).reduce((s,f) => s+Number(f.amount||0), 0);
+  const totalIn  = fees.filter(f =>  f.isPayment).reduce((s,f) => s+Number(f.amount||0), 0);
   return { totalOut, totalIn, net: totalOut - totalIn };
 }
 
 function genId() {
   const now = new Date();
-  const y = now.getFullYear().toString().slice(2);
-  const m = String(now.getMonth()+1).padStart(2,'0');
-  return `CC${y}${m}-${String(Math.floor(Math.random()*9000)+1000)}`;
+  return `CC${now.getFullYear().toString().slice(2)}${String(now.getMonth()+1).padStart(2,'0')}-${String(Math.floor(Math.random()*9000)+1000)}`;
 }
 function fmtMoney(n) { return Number(n||0).toLocaleString('zh-TW') + ' 元'; }
 function fmtM(n) { return '$' + Number(n||0).toLocaleString('zh-TW'); }
 function today() { return new Date().toISOString().split('T')[0]; }
+function thisYear() { return new Date().getFullYear(); }
 
-// ── 初始測試資料 ─────────────────────────────────────
+// ── 初始資料 ──────────────────────────────────────
 function seedData() {
   if (loadCases().length > 0) return;
   const cases = [
-    { id:'CC2601-1021', date:'2026-01-15', name:'王建志', idno:'A123456789', amount:380000, days:152, stage:'強制執行', court:'臺北地方法院', lawyer:'陳大律師事務所', casenumber:'114年度執字第8823號', gdlink:'https://drive.google.com/drive/folders/example1', notes:'已查封薪資，每月執行中' },
+    { id:'CC2601-1021', date:'2026-01-15', name:'王建志', idno:'A123456789', amount:380000, days:152, stage:'債權憑證', court:'臺北地方法院', lawyer:'陳大律師事務所', casenumber:'114年度執字第8823號', gdlink:'https://drive.google.com/drive/folders/example1', notes:'強制執行未果，已取得債權憑證' },
     { id:'CC2602-3344', date:'2026-02-03', name:'林美慧', idno:'F234567890', amount:125000, days:98,  stage:'訴訟',    court:'新北地方法院', lawyer:'李文律師', casenumber:'114年度訴字第5512號', gdlink:'', notes:'3/15開庭，待判決' },
-    { id:'CC2603-5678', date:'2026-03-20', name:'張志豪', idno:'C345678901', amount:52000,  days:45,  stage:'律師函',  court:'', lawyer:'法律事務所A', casenumber:'', gdlink:'https://drive.google.com/drive/folders/example3', notes:'律師函已寄出，等候回應' },
-    { id:'CC2603-8801', date:'2026-03-28', name:'陳靜宜', idno:'E456789012', amount:210000, days:62,  stage:'支付命令',court:'臺中地方法院', lawyer:'黃美玲律師', casenumber:'114年度司促字第22401號', gdlink:'', notes:'聲請中，尚未核定' },
+    { id:'CC2603-5678', date:'2026-03-20', name:'張志豪', idno:'C345678901', amount:52000,  days:45,  stage:'律師函',  court:'', lawyer:'法律事務所A', casenumber:'', gdlink:'', notes:'律師函已寄出' },
+    { id:'CC2603-8801', date:'2026-03-28', name:'陳靜宜', idno:'E456789012', amount:210000, days:62,  stage:'本票裁定',court:'臺中地方法院', lawyer:'黃美玲律師', casenumber:'114年度司促字第22401號', gdlink:'', notes:'聲請中' },
     { id:'CC2604-2233', date:'2026-04-10', name:'劉明宗', idno:'G567890123', amount:88000,  days:30,  stage:'存證信函',court:'', lawyer:'', casenumber:'', gdlink:'', notes:'第一封存證信函已發出' },
   ];
   saveCases(cases);
-  const fees = [
+  saveFees([
     { id:'F001', caseId:'CC2601-1021', date:'2026-01-20', type:'律師費',     desc:'委任陳律師處理執行程序', amount:25000, pay:'公司代墊', receipt:'INV-2601-001', isPayment:false },
-    { id:'F002', caseId:'CC2601-1021', date:'2026-02-01', type:'執行費',     desc:'聲請強制執行費用',       amount:3800,  pay:'匯款',   receipt:'',              isPayment:false },
-    { id:'F003', caseId:'CC2601-1021', date:'2026-03-05', type:'查址費',     desc:'查詢債務人財產',         amount:1500,  pay:'公司代墊',receipt:'RCP-0305',     isPayment:false },
-    // 收款沖銷：王建志協商匯回 10000
-    { id:'P001', caseId:'CC2601-1021', date:'2026-04-10', type:'收款沖銷',   desc:'借款方協商匯款第一期',   amount:10000, pay:'銀行匯款',receipt:'末五碼 88821', isPayment:true  },
-    { id:'F004', caseId:'CC2602-3344', date:'2026-02-10', type:'律師費',     desc:'委任李律師提起訴訟',     amount:40000, pay:'匯款',   receipt:'INV-2602-001',  isPayment:false },
-    { id:'F005', caseId:'CC2602-3344', date:'2026-02-15', type:'訴訟費',     desc:'裁判費',                 amount:6250,  pay:'匯款',   receipt:'',              isPayment:false },
-    { id:'F006', caseId:'CC2603-5678', date:'2026-03-22', type:'律師費',     desc:'律師函撰寫費',           amount:3000,  pay:'公司代墊',receipt:'INV-2603-001', isPayment:false },
-    { id:'F007', caseId:'CC2603-5678', date:'2026-03-22', type:'存證信函費', desc:'郵局存證信函',           amount:350,   pay:'現金',   receipt:'',              isPayment:false },
-    // 收款沖銷：張志豪匯回全部 3350
-    { id:'P002', caseId:'CC2603-5678', date:'2026-04-15', type:'收款沖銷',   desc:'借款方全額匯回催收費用', amount:3350,  pay:'銀行匯款',receipt:'末五碼 23456', isPayment:true  },
-    { id:'F008', caseId:'CC2603-8801', date:'2026-04-01', type:'律師費',     desc:'委任黃律師聲請支付命令', amount:8000,  pay:'匯款',   receipt:'INV-2604-001',  isPayment:false },
-    { id:'F009', caseId:'CC2603-8801', date:'2026-04-01', type:'訴訟費',     desc:'聲請費',                 amount:1050,  pay:'匯款',   receipt:'',              isPayment:false },
-    { id:'F010', caseId:'CC2604-2233', date:'2026-04-12', type:'存證信函費', desc:'郵局存證信函費用',       amount:350,   pay:'現金',   receipt:'',              isPayment:false },
-  ];
-  saveFees(fees);
+    { id:'F002', caseId:'CC2601-1021', date:'2026-02-01', type:'執行費',     desc:'聲請強制執行費用',       amount:3800,  pay:'匯款',    receipt:'',              isPayment:false },
+    { id:'F003', caseId:'CC2601-1021', date:'2026-03-05', type:'查址費',     desc:'查詢債務人財產',         amount:1500,  pay:'公司代墊',receipt:'RCP-0305',      isPayment:false },
+    { id:'P001', caseId:'CC2601-1021', date:'2026-04-10', type:'收款沖銷',   desc:'借款方協商匯款第一期',   amount:10000, pay:'銀行匯款',receipt:'末五碼88821',   isPayment:true  },
+    { id:'F004', caseId:'CC2602-3344', date:'2026-02-10', type:'律師費',     desc:'委任李律師提起訴訟',     amount:40000, pay:'匯款',    receipt:'INV-2602-001',  isPayment:false },
+    { id:'F005', caseId:'CC2602-3344', date:'2026-02-15', type:'訴訟費',     desc:'裁判費',                 amount:6250,  pay:'匯款',    receipt:'',              isPayment:false },
+    { id:'F006', caseId:'CC2603-5678', date:'2026-03-22', type:'律師費',     desc:'律師函撰寫費',           amount:3000,  pay:'公司代墊',receipt:'INV-2603-001',  isPayment:false },
+    { id:'F007', caseId:'CC2603-5678', date:'2026-03-22', type:'存證信函費', desc:'郵局存證信函',           amount:350,   pay:'現金',    receipt:'',              isPayment:false },
+    { id:'F008', caseId:'CC2603-8801', date:'2026-04-01', type:'律師費',     desc:'委任黃律師聲請本票裁定', amount:8000,  pay:'匯款',    receipt:'INV-2604-001',  isPayment:false },
+    { id:'F009', caseId:'CC2603-8801', date:'2026-04-01', type:'訴訟費',     desc:'聲請費',                 amount:1050,  pay:'匯款',    receipt:'',              isPayment:false },
+    { id:'F010', caseId:'CC2604-2233', date:'2026-04-12', type:'存證信函費', desc:'郵局存證信函費用',       amount:350,   pay:'現金',    receipt:'',              isPayment:false },
+  ]);
+  // 示範：王建志債權憑證案件的年度調閱記錄
+  saveReviews([
+    { id:'R001', caseId:'CC2601-1021', year:2025, taxdate:'2025-06-30', reviewdate:'2025-07-15', property:'名下無不動產、無車輛登記', income:'全年所得 0 元，無薪資收入', asset:'無', action:'繼續監控（明年再調閱）', execfee:0, notes:'持續追蹤' },
+  ]);
 }
 
-// ── 統計卡片 ─────────────────────────────────────────
+// ── 統計卡片 ─────────────────────────────────────
 function renderStats() {
   const cases = loadCases();
   const fees  = loadFees();
-  const totalLoan    = cases.reduce((s,c) => s + Number(c.amount||0), 0);
-  const totalOut     = fees.filter(f => !f.isPayment).reduce((s,f) => s + Number(f.amount||0), 0);
-  const totalIn      = fees.filter(f =>  f.isPayment).reduce((s,f) => s + Number(f.amount||0), 0);
-  const netFees      = totalOut - totalIn;
-  const activeCases  = cases.filter(c => c.stage !== '結案').length;
+  const totalLoan   = cases.reduce((s,c) => s+Number(c.amount||0), 0);
+  const totalOut    = fees.filter(f=>!f.isPayment).reduce((s,f)=>s+Number(f.amount||0), 0);
+  const totalIn     = fees.filter(f=> f.isPayment).reduce((s,f)=>s+Number(f.amount||0), 0);
+  const netFees     = totalOut - totalIn;
+  const activeCases = cases.filter(c=>c.stage!=='結案').length;
+  const certCases   = cases.filter(c=>c.stage==='債權憑證').length;
   document.getElementById('stats-grid').innerHTML = `
-    <div class="stat-card blue">
-      <div class="stat-label">總案件數</div>
-      <div class="stat-value">${cases.length}</div>
-      <div class="stat-sub">進行中 ${activeCases} 件</div>
-    </div>
-    <div class="stat-card red">
-      <div class="stat-label">總逾期金額</div>
-      <div class="stat-value" style="font-size:19px;">${fmtM(totalLoan)}</div>
-      <div class="stat-sub">平均 ${cases.length ? fmtM(Math.round(totalLoan/cases.length)) : '$0'}/件</div>
-    </div>
-    <div class="stat-card orange">
-      <div class="stat-label">累計代墊費用</div>
-      <div class="stat-value" style="font-size:19px;">${fmtM(totalOut)}</div>
-      <div class="stat-sub">${fees.filter(f=>!f.isPayment).length} 筆費用記錄</div>
-    </div>
-    <div class="stat-card green">
-      <div class="stat-label">已收回費用</div>
-      <div class="stat-value" style="font-size:19px;color:#276749;">${fmtM(totalIn)}</div>
-      <div class="stat-sub">${fees.filter(f=>f.isPayment).length} 筆收款記錄</div>
-    </div>
-    <div class="stat-card teal">
-      <div class="stat-label">淨墊款餘額</div>
-      <div class="stat-value" style="font-size:19px;color:#dd6b20;">${fmtM(netFees)}</div>
-      <div class="stat-sub">尚待追討費用</div>
-    </div>
+    <div class="stat-card blue"><div class="stat-label">總案件數</div><div class="stat-value">${cases.length}</div><div class="stat-sub">進行中 ${activeCases} 件</div></div>
+    <div class="stat-card red"><div class="stat-label">總逾期金額</div><div class="stat-value" style="font-size:19px;">${fmtM(totalLoan)}</div><div class="stat-sub">平均 ${cases.length?fmtM(Math.round(totalLoan/cases.length)):'$0'}/件</div></div>
+    <div class="stat-card orange"><div class="stat-label">累計代墊費用</div><div class="stat-value" style="font-size:19px;">${fmtM(totalOut)}</div><div class="stat-sub">${fees.filter(f=>!f.isPayment).length} 筆記錄</div></div>
+    <div class="stat-card green"><div class="stat-label">已收回費用</div><div class="stat-value" style="font-size:19px;color:#276749;">${fmtM(totalIn)}</div><div class="stat-sub">淨墊款 ${fmtM(netFees)}</div></div>
+    <div class="stat-card purple"><div class="stat-label">債權憑證監控中</div><div class="stat-value">${certCases}</div><div class="stat-sub">件持續年度追蹤</div></div>
   `;
 }
 
-// ── 圖表 ──────────────────────────────────────────────
+// ── 圖表 ─────────────────────────────────────────
 let stageChartInst, feeChartInst;
-const STAGE_COLORS = { '催告':'#93c5fd','存證信函':'#fcd34d','律師函':'#fdba74','支付命令':'#f9a8d4','訴訟':'#c4b5fd','強制執行':'#fca5a5','結案':'#6ee7b7' };
+const STAGE_COLORS = { '催告':'#93c5fd','存證信函':'#fcd34d','律師函':'#fdba74','本票裁定':'#f9a8d4','訴訟':'#c4b5fd','強制執行':'#fca5a5','債權憑證':'#c4b5fd','結案':'#6ee7b7' };
+const ALL_STAGES = ['催告','存證信函','律師函','本票裁定','訴訟','強制執行','債權憑證','結案'];
 
 function renderCharts() {
   const cases = loadCases();
   const fees  = loadFees();
-  const stages = ['催告','存證信函','律師函','支付命令','訴訟','強制執行','結案'];
-  const stageCounts = stages.map(s => cases.filter(c => c.stage === s).length);
+  const stageCounts = ALL_STAGES.map(s => cases.filter(c=>c.stage===s).length);
 
   if (stageChartInst) stageChartInst.destroy();
   stageChartInst = new Chart(document.getElementById('stageChart'), {
     type:'doughnut',
-    data:{ labels:stages, datasets:[{ data:stageCounts, backgroundColor:stages.map(s=>STAGE_COLORS[s]), borderWidth:0 }] },
-    options:{ plugins:{ legend:{ position:'right', labels:{ font:{ size:11 }, boxWidth:12 } } }, cutout:'60%' }
+    data:{ labels:ALL_STAGES, datasets:[{ data:stageCounts, backgroundColor:ALL_STAGES.map(s=>STAGE_COLORS[s]||'#cbd5e0'), borderWidth:0 }] },
+    options:{ plugins:{ legend:{ position:'right', labels:{ font:{ size:10 }, boxWidth:10 } } }, cutout:'60%' }
   });
 
-  // 每個案件的代墊 vs 收回
-  const caseLabels = cases.map(c => c.name);
-  const outData = cases.map(c => caseFeesSummary(c.id).totalOut);
-  const inData  = cases.map(c => caseFeesSummary(c.id).totalIn);
+  const caseLabels = cases.map(c=>c.name);
+  const outData = cases.map(c=>caseFeesSummary(c.id).totalOut);
+  const inData  = cases.map(c=>caseFeesSummary(c.id).totalIn);
 
   if (feeChartInst) feeChartInst.destroy();
   feeChartInst = new Chart(document.getElementById('feeChart'), {
     type:'bar',
-    data:{
-      labels: caseLabels,
-      datasets:[
-        { label:'代墊費用', data:outData, backgroundColor:'#fc8181', borderRadius:4 },
-        { label:'已收回',   data:inData,  backgroundColor:'#68d391', borderRadius:4 },
-      ]
-    },
-    options:{
-      plugins:{ legend:{ labels:{ font:{ size:11 }, boxWidth:12 } } },
-      scales:{ y:{ ticks:{ callback:v=>'$'+v.toLocaleString(), font:{ size:10 } } }, x:{ ticks:{ font:{ size:10 } } } }
-    }
+    data:{ labels:caseLabels, datasets:[
+      { label:'代墊費用', data:outData, backgroundColor:'#fc8181', borderRadius:4 },
+      { label:'已收回',   data:inData,  backgroundColor:'#68d391', borderRadius:4 },
+    ]},
+    options:{ plugins:{ legend:{ labels:{ font:{ size:11 }, boxWidth:12 } } }, scales:{ y:{ ticks:{ callback:v=>'$'+v.toLocaleString(), font:{ size:10 } } }, x:{ ticks:{ font:{ size:10 } } } } }
   });
 }
 
-// ── 案件表格 ──────────────────────────────────────────
+// ── 案件表格 ──────────────────────────────────────
 function renderTable() {
   let cases = loadCases();
   const search = document.getElementById('search-input').value.toLowerCase();
@@ -628,35 +631,33 @@ function renderTable() {
   const court  = document.getElementById('filter-court').value;
   const sort   = document.getElementById('sort-by').value;
 
-  const courts = [...new Set(cases.map(c => c.court).filter(Boolean))];
+  const courts = [...new Set(cases.map(c=>c.court).filter(Boolean))];
   const courtSel = document.getElementById('filter-court');
   const curCourt = courtSel.value;
-  courtSel.innerHTML = '<option value="">全部法院</option>' + courts.map(c => `<option ${c===curCourt?'selected':''}>${c}</option>`).join('');
+  courtSel.innerHTML = '<option value="">全部法院</option>'+courts.map(c=>`<option ${c===curCourt?'selected':''}>${c}</option>`).join('');
 
-  if (search) cases = cases.filter(c => c.name.toLowerCase().includes(search) || c.id.toLowerCase().includes(search) || (c.idno||'').toLowerCase().includes(search));
-  if (stage)  cases = cases.filter(c => c.stage === stage);
-  if (court)  cases = cases.filter(c => c.court === court);
-
-  if (sort==='date-desc')   cases.sort((a,b) => b.date.localeCompare(a.date));
-  else if (sort==='date-asc')    cases.sort((a,b) => a.date.localeCompare(b.date));
-  else if (sort==='amount-desc') cases.sort((a,b) => Number(b.amount||0)-Number(a.amount||0));
-  else if (sort==='amount-asc')  cases.sort((a,b) => Number(a.amount||0)-Number(b.amount||0));
+  if (search) cases = cases.filter(c=>c.name.toLowerCase().includes(search)||c.id.toLowerCase().includes(search)||(c.idno||'').toLowerCase().includes(search));
+  if (stage)  cases = cases.filter(c=>c.stage===stage);
+  if (court)  cases = cases.filter(c=>c.court===court);
+  if (sort==='date-desc')   cases.sort((a,b)=>b.date.localeCompare(a.date));
+  else if (sort==='date-asc')    cases.sort((a,b)=>a.date.localeCompare(b.date));
+  else if (sort==='amount-desc') cases.sort((a,b)=>Number(b.amount||0)-Number(a.amount||0));
+  else if (sort==='amount-asc')  cases.sort((a,b)=>Number(a.amount||0)-Number(b.amount||0));
 
   const tbody = document.getElementById('case-tbody');
-  if (cases.length === 0) {
-    tbody.innerHTML = '';
-    document.getElementById('table-empty').style.display = 'block';
-    document.getElementById('table-summary').textContent = '';
-    return;
-  }
-  document.getElementById('table-empty').style.display = 'none';
+  if (cases.length === 0) { tbody.innerHTML=''; document.getElementById('table-empty').style.display='block'; document.getElementById('table-summary').textContent=''; return; }
+  document.getElementById('table-empty').style.display='none';
 
+  const reviews = loadReviews();
   tbody.innerHTML = cases.map(c => {
     const { totalOut, totalIn, net } = caseFeesSummary(c.id);
-    const netClass = net <= 0 ? 'zero' : 'positive';
-    return `<tr style="border-bottom:1px solid #f0f4f8;">
+    const netClass = net<=0?'zero':'positive';
+    const isCert = c.stage==='債權憑證';
+    const certCount = isCert ? reviews.filter(r=>r.caseId===c.id).length : 0;
+    const rowBg = isCert ? 'background:#faf5ff;' : '';
+    return `<tr style="border-bottom:1px solid #f0f4f8;${rowBg}">
       <td style="padding:10px 12px;font-size:12px;font-family:monospace;color:#4a5568;">${c.id}</td>
-      <td style="padding:10px 12px;font-weight:600;">${c.name}</td>
+      <td style="padding:10px 12px;font-weight:600;">${c.name}${isCert?` <span style="font-size:10px;color:#6b46c1;font-weight:600;">📅${certCount}次</span>`:''}</td>
       <td style="padding:10px 12px;color:#c53030;font-weight:600;">${fmtM(c.amount)}</td>
       <td style="padding:10px 12px;"><span class="badge badge-${c.stage}">${c.stage}</span></td>
       <td style="padding:10px 12px;font-size:12px;color:#4a5568;">${c.lawyer||'—'}</td>
@@ -675,192 +676,206 @@ function renderTable() {
       </td>
     </tr>`;
   }).join('');
-
-  const total = cases.reduce((s,c) => s+Number(c.amount||0), 0);
-  document.getElementById('table-summary').textContent = `顯示 ${cases.length} 件，逾期金額合計 ${fmtMoney(total)}`;
+  document.getElementById('table-summary').textContent = `顯示 ${cases.length} 件，逾期金額合計 ${fmtMoney(cases.reduce((s,c)=>s+Number(c.amount||0),0))}`;
 }
 
-// ── 費用 & 沖銷明細 ───────────────────────────────────
+// ── 費用明細 ─────────────────────────────────────
 function renderFeeTable() {
   const cases = loadCases();
   let fees = loadFees();
   const caseFilter = document.getElementById('fee-filter-case').value;
   const typeFilter = document.getElementById('fee-filter-type').value;
 
-  // 更新案件下拉
   const caseSel = document.getElementById('fee-filter-case');
   const curCase = caseSel.value;
-  caseSel.innerHTML = '<option value="">全部案件</option>' + cases.map(c => `<option value="${c.id}" ${c.id===curCase?'selected':''}>${c.id} ${c.name}</option>`).join('');
+  caseSel.innerHTML = '<option value="">全部案件</option>'+cases.map(c=>`<option value="${c.id}" ${c.id===curCase?'selected':''}>${c.id} ${c.name}</option>`).join('');
 
-  if (caseFilter) fees = fees.filter(f => f.caseId === caseFilter);
-  if (typeFilter === '__payment__') fees = fees.filter(f => f.isPayment);
-  else if (typeFilter) fees = fees.filter(f => f.type === typeFilter);
-  fees.sort((a,b) => b.date.localeCompare(a.date));
+  if (caseFilter) fees = fees.filter(f=>f.caseId===caseFilter);
+  if (typeFilter==='__payment__') fees = fees.filter(f=>f.isPayment);
+  else if (typeFilter) fees = fees.filter(f=>f.type===typeFilter);
+  fees.sort((a,b)=>b.date.localeCompare(a.date));
 
-  // 沖銷摘要看板
-  const summaryFees = caseFilter ? loadFees().filter(f => f.caseId === caseFilter) : loadFees();
-  const sumOut = summaryFees.filter(f=>!f.isPayment).reduce((s,f)=>s+Number(f.amount||0),0);
-  const sumIn  = summaryFees.filter(f=> f.isPayment).reduce((s,f)=>s+Number(f.amount||0),0);
-  const sumNet = sumOut - sumIn;
-  document.getElementById('offset-summary-box').innerHTML = `
-    <div class="offset-summary">
-      <div class="offset-box out">
-        <div class="label">📤 代墊費用合計</div>
-        <div class="value">${fmtM(sumOut)}</div>
-      </div>
-      <div class="offset-box in">
-        <div class="label">📥 借款方收回合計</div>
-        <div class="value">${fmtM(sumIn)}</div>
-      </div>
-      <div class="offset-box net">
-        <div class="label">⚖️ 淨墊款餘額</div>
-        <div class="value">${fmtM(sumNet)}</div>
-      </div>
-    </div>`;
+  const sf = caseFilter ? loadFees().filter(f=>f.caseId===caseFilter) : loadFees();
+  const sumOut=sf.filter(f=>!f.isPayment).reduce((s,f)=>s+Number(f.amount||0),0);
+  const sumIn =sf.filter(f=> f.isPayment).reduce((s,f)=>s+Number(f.amount||0),0);
+  document.getElementById('offset-summary-box').innerHTML=`<div class="offset-summary"><div class="offset-box out"><div class="label">📤 代墊費用合計</div><div class="value">${fmtM(sumOut)}</div></div><div class="offset-box in"><div class="label">📥 借款方收回合計</div><div class="value">${fmtM(sumIn)}</div></div><div class="offset-box net"><div class="label">⚖️ 淨墊款餘額</div><div class="value">${fmtM(sumOut-sumIn)}</div></div></div>`;
 
   const tbody = document.getElementById('fee-tbody');
-  if (fees.length === 0) {
-    tbody.innerHTML = '';
-    document.getElementById('fee-tfoot').innerHTML = '';
-    document.getElementById('fee-empty').style.display = 'block';
-    return;
-  }
-  document.getElementById('fee-empty').style.display = 'none';
+  if (fees.length===0) { tbody.innerHTML=''; document.getElementById('fee-tfoot').innerHTML=''; document.getElementById('fee-empty').style.display='block'; return; }
+  document.getElementById('fee-empty').style.display='none';
 
   tbody.innerHTML = fees.map(f => {
-    const c = cases.find(c => c.id === f.caseId);
-    if (f.isPayment) {
-      return `<tr class="row-payment">
-        <td>${f.date}</td>
-        <td style="font-size:12px;font-family:monospace;">${f.caseId}</td>
-        <td style="font-weight:500;">${c?c.name:'—'}</td>
-        <td><span class="tag-payment">📥 收款沖銷</span></td>
-        <td style="color:#276749;">${f.desc}</td>
-        <td style="color:#a0aec0;">—</td>
-        <td class="amount-in">+ ${fmtM(f.amount)}</td>
-        <td style="font-size:12px;color:#718096;">${f.pay}</td>
-        <td style="font-size:12px;color:#a0aec0;">${f.receipt||'—'}</td>
-        <td><button class="btn btn-danger btn-sm" onclick="deleteFee('${f.id}')">刪除</button></td>
-      </tr>`;
-    } else {
-      return `<tr class="row-fee">
-        <td>${f.date}</td>
-        <td style="font-size:12px;font-family:monospace;">${f.caseId}</td>
-        <td style="font-weight:500;">${c?c.name:'—'}</td>
-        <td><span class="tag-fee">📤 ${f.type}</span></td>
-        <td style="color:#4a5568;">${f.desc}</td>
-        <td class="amount-out">- ${fmtM(f.amount)}</td>
-        <td style="color:#a0aec0;">—</td>
-        <td style="font-size:12px;color:#718096;">${f.pay}</td>
-        <td style="font-size:12px;color:#a0aec0;">${f.receipt||'—'}</td>
-        <td><button class="btn btn-danger btn-sm" onclick="deleteFee('${f.id}')">刪除</button></td>
-      </tr>`;
-    }
+    const c = cases.find(c=>c.id===f.caseId);
+    return f.isPayment
+      ? `<tr class="row-payment"><td>${f.date}</td><td style="font-size:12px;font-family:monospace;">${f.caseId}</td><td style="font-weight:500;">${c?c.name:'—'}</td><td><span class="tag-payment">📥 收款沖銷</span></td><td style="color:#276749;">${f.desc}</td><td style="color:#a0aec0;">—</td><td class="amount-in">+ ${fmtM(f.amount)}</td><td style="font-size:12px;color:#718096;">${f.pay}</td><td style="font-size:12px;color:#a0aec0;">${f.receipt||'—'}</td><td><button class="btn btn-danger btn-sm" onclick="deleteFee('${f.id}')">刪除</button></td></tr>`
+      : `<tr class="row-fee"><td>${f.date}</td><td style="font-size:12px;font-family:monospace;">${f.caseId}</td><td style="font-weight:500;">${c?c.name:'—'}</td><td><span class="tag-fee">📤 ${f.type}</span></td><td style="color:#4a5568;">${f.desc}</td><td class="amount-out">- ${fmtM(f.amount)}</td><td style="color:#a0aec0;">—</td><td style="font-size:12px;color:#718096;">${f.pay}</td><td style="font-size:12px;color:#a0aec0;">${f.receipt||'—'}</td><td><button class="btn btn-danger btn-sm" onclick="deleteFee('${f.id}')">刪除</button></td></tr>`;
   }).join('');
 
-  const totalOut = fees.filter(f=>!f.isPayment).reduce((s,f)=>s+Number(f.amount||0),0);
-  const totalIn  = fees.filter(f=> f.isPayment).reduce((s,f)=>s+Number(f.amount||0),0);
-  const net = totalOut - totalIn;
-  document.getElementById('fee-tfoot').innerHTML = `
-    <tr class="total-row">
-      <td colspan="5" style="padding:10px 12px;text-align:right;font-size:12px;">合計（篩選結果）</td>
-      <td style="padding:10px 12px;" class="amount-out">${fmtM(totalOut)}</td>
-      <td style="padding:10px 12px;" class="amount-in">+ ${fmtM(totalIn)}</td>
-      <td colspan="3" style="padding:10px 12px;font-size:12px;color:#dd6b20;font-weight:700;">淨墊款 ${fmtM(net)}</td>
-    </tr>`;
+  const tOut=fees.filter(f=>!f.isPayment).reduce((s,f)=>s+Number(f.amount||0),0);
+  const tIn =fees.filter(f=> f.isPayment).reduce((s,f)=>s+Number(f.amount||0),0);
+  document.getElementById('fee-tfoot').innerHTML=`<tr class="total-row"><td colspan="5" style="padding:10px 12px;text-align:right;font-size:12px;">合計（篩選結果）</td><td style="padding:10px 12px;" class="amount-out">${fmtM(tOut)}</td><td style="padding:10px 12px;" class="amount-in">+ ${fmtM(tIn)}</td><td colspan="3" style="padding:10px 12px;font-size:12px;color:#dd6b20;font-weight:700;">淨墊款 ${fmtM(tOut-tIn)}</td></tr>`;
 }
 
-// ── Tab 切換 ──────────────────────────────────────────
+// ── 年度調閱 Tab ──────────────────────────────────
+function renderReviewsTab() {
+  const cases = loadCases().filter(c=>c.stage==='債權憑證');
+  let reviews = loadReviews();
+  const caseFilter = document.getElementById('review-filter-case').value;
+  const yearFilter = document.getElementById('review-filter-year').value;
+
+  // 更新案件下拉
+  const caseSel = document.getElementById('review-filter-case');
+  const cur = caseSel.value;
+  caseSel.innerHTML = '<option value="">全部債權憑證案件</option>'+cases.map(c=>`<option value="${c.id}" ${c.id===cur?'selected':''}>${c.id} ${c.name}</option>`).join('');
+
+  // 更新年度下拉
+  const years = [...new Set(reviews.map(r=>r.year))].sort((a,b)=>b-a);
+  const yearSel = document.getElementById('review-filter-year');
+  const curYear = yearSel.value;
+  yearSel.innerHTML = '<option value="">全部年度</option>'+years.map(y=>`<option value="${y}" ${String(y)===curYear?'selected':''}>${y} 年度</option>`).join('');
+
+  if (caseFilter) reviews = reviews.filter(r=>r.caseId===caseFilter);
+  if (yearFilter) reviews = reviews.filter(r=>String(r.year)===yearFilter);
+  reviews.sort((a,b)=>b.year-a.year||b.reviewdate.localeCompare(a.reviewdate));
+
+  const el = document.getElementById('reviews-content');
+  if (reviews.length===0) { el.innerHTML=''; document.getElementById('reviews-empty').style.display='block'; return; }
+  document.getElementById('reviews-empty').style.display='none';
+
+  // 依案件分組
+  const grouped = {};
+  reviews.forEach(r => { if (!grouped[r.caseId]) grouped[r.caseId]=[]; grouped[r.caseId].push(r); });
+
+  el.innerHTML = Object.entries(grouped).map(([caseId, rs]) => {
+    const c = loadCases().find(c=>c.id===caseId);
+    return `<div class="cert-section">
+      <div class="cert-section-title">
+        <span>📄 ${c?c.name:caseId} <span style="font-size:11px;font-weight:400;color:#718096;margin-left:8px;">${caseId} · 逾期 ${c?fmtMoney(c.amount):''}</span></span>
+        <button class="btn btn-purple btn-sm" onclick="openAddReviewFor('${caseId}')">＋ 新增本年度記錄</button>
+      </div>
+      ${rs.map(r => `<div class="review-card">
+        <div class="review-card-header">
+          <div class="review-year">${r.year} 年度調閱</div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <span class="${r.asset==='有'?'tag-asset-yes':'tag-asset-no'}">${r.asset==='有'?'⚠️ 有可執行資產':'✅ 無可執行資產'}</span>
+            <span class="tag-action">${r.action.split('（')[0]}</span>
+            <button class="btn btn-danger btn-sm" onclick="deleteReview('${r.id}')">刪除</button>
+          </div>
+        </div>
+        <div class="review-grid">
+          <div class="review-item"><div class="rlabel">綜所稅申報完成日</div><div class="rvalue">${r.taxdate||'—'}</div></div>
+          <div class="review-item"><div class="rlabel">財產/所得調閱日</div><div class="rvalue">${r.reviewdate||'—'}</div></div>
+          <div class="review-item"><div class="rlabel">財產清冊結果</div><div class="rvalue">${r.property||'—'}</div></div>
+          <div class="review-item"><div class="rlabel">所得清冊結果</div><div class="rvalue">${r.income||'—'}</div></div>
+          ${r.execfee>0?`<div class="review-item"><div class="rlabel">再執行費用</div><div class="rvalue" style="color:#c53030;">${fmtMoney(r.execfee)}</div></div>`:''}
+          ${r.notes?`<div class="review-item" style="grid-column:1/-1;"><div class="rlabel">備註</div><div class="rvalue">${r.notes}</div></div>`:''}
+        </div>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+// ── Tab 切換 ─────────────────────────────────────
 function switchTab(name) {
-  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['cases','fees','guide'][i] === name));
-  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  const tabs = ['cases','fees','reviews','guide'];
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',tabs[i]===name));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
   document.getElementById(`tab-${name}`).classList.add('active');
-  if (name === 'fees') renderFeeTable();
+  if (name==='fees') renderFeeTable();
+  if (name==='reviews') renderReviewsTab();
 }
 
-// ── Modal ─────────────────────────────────────────────
+// ── Modal ─────────────────────────────────────────
 function openModal(id)  { document.getElementById(id).classList.add('active'); }
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
 // 案件
 let editingId = null;
 function openAddCase() {
-  editingId = null;
-  document.getElementById('modal-title-text').textContent = '新增催收案件';
-  document.getElementById('f-id').value = genId();
-  document.getElementById('f-date').value = today();
-  ['f-name','f-idno','f-amount','f-days','f-court','f-lawyer','f-casenumber','f-gdlink','f-notes'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('f-stage').value = '存證信函';
+  editingId=null;
+  document.getElementById('modal-title-text').textContent='新增催收案件';
+  document.getElementById('f-id').value=genId();
+  document.getElementById('f-date').value=today();
+  ['f-name','f-idno','f-amount','f-days','f-court','f-lawyer','f-casenumber','f-gdlink','f-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-stage').value='存證信函';
   openModal('case-modal');
 }
 function editCase(id) {
-  const c = loadCases().find(x => x.id === id);
-  if (!c) return;
-  editingId = id;
-  document.getElementById('modal-title-text').textContent = '編輯催收案件';
-  document.getElementById('f-id').value = c.id;
-  document.getElementById('f-date').value = c.date;
-  document.getElementById('f-name').value = c.name;
-  document.getElementById('f-idno').value = c.idno||'';
-  document.getElementById('f-amount').value = c.amount;
-  document.getElementById('f-days').value = c.days||'';
-  document.getElementById('f-stage').value = c.stage;
-  document.getElementById('f-court').value = c.court||'';
-  document.getElementById('f-lawyer').value = c.lawyer||'';
-  document.getElementById('f-casenumber').value = c.casenumber||'';
-  document.getElementById('f-gdlink').value = c.gdlink||'';
-  document.getElementById('f-notes').value = c.notes||'';
+  const c=loadCases().find(x=>x.id===id); if(!c) return;
+  editingId=id;
+  document.getElementById('modal-title-text').textContent='編輯催收案件';
+  document.getElementById('f-id').value=c.id; document.getElementById('f-date').value=c.date;
+  document.getElementById('f-name').value=c.name; document.getElementById('f-idno').value=c.idno||'';
+  document.getElementById('f-amount').value=c.amount; document.getElementById('f-days').value=c.days||'';
+  document.getElementById('f-stage').value=c.stage; document.getElementById('f-court').value=c.court||'';
+  document.getElementById('f-lawyer').value=c.lawyer||''; document.getElementById('f-casenumber').value=c.casenumber||'';
+  document.getElementById('f-gdlink').value=c.gdlink||''; document.getElementById('f-notes').value=c.notes||'';
   openModal('case-modal');
 }
 function saveCase() {
-  const data = {
-    id: document.getElementById('f-id').value.trim(),
-    date: document.getElementById('f-date').value,
-    name: document.getElementById('f-name').value.trim(),
-    idno: document.getElementById('f-idno').value.trim(),
-    amount: Number(document.getElementById('f-amount').value)||0,
-    days: Number(document.getElementById('f-days').value)||0,
-    stage: document.getElementById('f-stage').value,
-    court: document.getElementById('f-court').value.trim(),
-    lawyer: document.getElementById('f-lawyer').value.trim(),
-    casenumber: document.getElementById('f-casenumber').value.trim(),
-    gdlink: document.getElementById('f-gdlink').value.trim(),
-    notes: document.getElementById('f-notes').value.trim(),
+  const data={
+    id:document.getElementById('f-id').value.trim(), date:document.getElementById('f-date').value,
+    name:document.getElementById('f-name').value.trim(), idno:document.getElementById('f-idno').value.trim(),
+    amount:Number(document.getElementById('f-amount').value)||0, days:Number(document.getElementById('f-days').value)||0,
+    stage:document.getElementById('f-stage').value, court:document.getElementById('f-court').value.trim(),
+    lawyer:document.getElementById('f-lawyer').value.trim(), casenumber:document.getElementById('f-casenumber').value.trim(),
+    gdlink:document.getElementById('f-gdlink').value.trim(), notes:document.getElementById('f-notes').value.trim(),
   };
-  if (!data.id || !data.name || !data.date) { alert('請填寫案件編號、借款人姓名和日期'); return; }
-  let cases = loadCases();
-  if (editingId) { cases = cases.map(c => c.id === editingId ? data : c); }
-  else { if (cases.find(c => c.id === data.id)) { alert('案件編號已存在'); return; } cases.push(data); }
-  saveCases(cases);
-  closeModal('case-modal');
-  refresh();
+  if (!data.id||!data.name||!data.date) { alert('請填寫案件編號、借款人姓名和日期'); return; }
+  let cases=loadCases();
+  if (editingId) { cases=cases.map(c=>c.id===editingId?data:c); }
+  else { if(cases.find(c=>c.id===data.id)){alert('案件編號已存在');return;} cases.push(data); }
+  saveCases(cases); closeModal('case-modal'); refresh();
 }
 function deleteCase(id) {
-  if (!confirm(`確定要刪除案件 ${id}？\n相關費用與收款記錄也會一併刪除。`)) return;
-  saveCases(loadCases().filter(c => c.id !== id));
-  saveFees(loadFees().filter(f => f.caseId !== id));
+  if(!confirm(`確定要刪除案件 ${id}？\n相關費用、收款記錄、年度調閱記錄也會一併刪除。`)) return;
+  saveCases(loadCases().filter(c=>c.id!==id));
+  saveFees(loadFees().filter(f=>f.caseId!==id));
+  saveReviews(loadReviews().filter(r=>r.caseId!==id));
   refresh();
 }
 
 // 案件詳情
 function viewDetail(id) {
-  const c = loadCases().find(x => x.id === id);
-  if (!c) return;
-  const { totalOut, totalIn, net } = caseFeesSummary(id);
-  const fees = loadFees().filter(f => f.caseId === id).sort((a,b) => b.date.localeCompare(a.date));
+  const c=loadCases().find(x=>x.id===id); if(!c) return;
+  const {totalOut,totalIn,net}=caseFeesSummary(id);
+  const fees=loadFees().filter(f=>f.caseId===id).sort((a,b)=>b.date.localeCompare(a.date));
+  const reviews=loadReviews().filter(r=>r.caseId===id).sort((a,b)=>b.year-a.year);
+  const isCert = c.stage==='債權憑證';
 
-  const STAGES = ['催告','存證信函','律師函','支付命令','訴訟','強制執行'];
-  const stageIdx = STAGES.indexOf(c.stage);
-  const progressHtml = c.stage !== '結案' ? `<div class="stage-progress">` + STAGES.map((s,i) =>
-    `<div class="stage-step ${i<stageIdx?'done':i===stageIdx?'current':''}">${s}</div>`).join('') + `</div>` : '';
+  const STAGES=['催告','存證信函','律師函','本票裁定','訴訟','強制執行','債權憑證'];
+  const stageIdx=STAGES.indexOf(c.stage);
+  const progressHtml=(c.stage!=='結案')?`<div class="stage-progress">`+STAGES.map((s,i)=>{
+    let cls=''; if(i<stageIdx) cls='done'; else if(i===stageIdx) cls=s==='債權憑證'?'current-cert':'current';
+    return `<div class="stage-step ${cls}">${s}</div>`;
+  }).join('')+`</div>`:'';
 
-  const feeRows = fees.length ? fees.map(f => f.isPayment
-    ? `<tr class="row-payment"><td>${f.date}</td><td><span class="tag-payment">📥 收款沖銷</span></td><td style="color:#276749;">${f.desc}</td><td>—</td><td class="amount-in">+ ${fmtM(f.amount)}</td><td style="font-size:12px;color:#a0aec0;">${f.receipt||'—'}</td></tr>`
-    : `<tr><td>${f.date}</td><td><span class="tag-fee">📤 ${f.type}</span></td><td>${f.desc}</td><td class="amount-out">- ${fmtM(f.amount)}</td><td>—</td><td style="font-size:12px;color:#a0aec0;">${f.receipt||'—'}</td></tr>`
-  ).join('') : '<tr><td colspan="6" style="text-align:center;color:#a0aec0;padding:16px;">尚無記錄</td></tr>';
+  const feeRows=fees.length?fees.map(f=>f.isPayment
+    ?`<tr class="row-payment"><td>${f.date}</td><td><span class="tag-payment">📥 收款沖銷</span></td><td style="color:#276749;">${f.desc}</td><td>—</td><td class="amount-in">+ ${fmtM(f.amount)}</td><td style="font-size:12px;color:#a0aec0;">${f.receipt||'—'}</td></tr>`
+    :`<tr><td>${f.date}</td><td><span class="tag-fee">📤 ${f.type}</span></td><td>${f.desc}</td><td class="amount-out">- ${fmtM(f.amount)}</td><td>—</td><td style="font-size:12px;color:#a0aec0;">${f.receipt||'—'}</td></tr>`
+  ).join(''):'<tr><td colspan="6" style="text-align:center;color:#a0aec0;padding:16px;">尚無記錄</td></tr>';
 
-  document.getElementById('detail-title').textContent = `${c.id} · ${c.name}`;
-  document.getElementById('detail-content').innerHTML = `
+  const certHtml=isCert?`
+    <div class="cert-section" style="margin-bottom:16px;">
+      <div class="cert-section-title"><span>📅 債權憑證年度調閱記錄（${reviews.length} 次）</span>
+        <button class="btn btn-purple btn-sm" onclick="closeModal('detail-modal');openAddReviewFor('${id}')">＋ 新增本年度記錄</button>
+      </div>
+      ${reviews.length?reviews.map(r=>`<div class="review-card">
+        <div class="review-card-header">
+          <div class="review-year">${r.year} 年度</div>
+          <div style="display:flex;gap:6px;"><span class="${r.asset==='有'?'tag-asset-yes':'tag-asset-no'}">${r.asset==='有'?'⚠️ 有資產':'✅ 無資產'}</span><span class="tag-action">${r.action.split('（')[0]}</span></div>
+        </div>
+        <div class="review-grid">
+          <div class="review-item"><div class="rlabel">調閱日期</div><div class="rvalue">${r.reviewdate||'—'}</div></div>
+          <div class="review-item"><div class="rlabel">財產清冊</div><div class="rvalue">${r.property||'—'}</div></div>
+          <div class="review-item"><div class="rlabel">所得清冊</div><div class="rvalue">${r.income||'—'}</div></div>
+          ${r.execfee>0?`<div class="review-item"><div class="rlabel">再執行費</div><div class="rvalue" style="color:#c53030;">${fmtMoney(r.execfee)}</div></div>`:''}
+        </div>
+      </div>`).join(''):'<div style="text-align:center;color:#a0aec0;padding:16px;font-size:13px;">尚無調閱記錄，請新增本年度記錄。</div>'}
+    </div>`:'';
+
+  document.getElementById('detail-title').textContent=`${c.id} · ${c.name}`;
+  document.getElementById('detail-content').innerHTML=`
     ${progressHtml}
     <div class="case-detail-grid">
       <div class="detail-item"><div class="label">借款人</div><div class="value">${c.name}</div></div>
@@ -877,6 +892,7 @@ function viewDetail(id) {
     </div>
     ${c.gdlink?`<div class="gd-note">📂 <a href="${c.gdlink}" target="_blank" style="color:#2b6cb0;">開啟 Google Drive 法院文件資料夾</a></div>`:''}
     ${c.notes?`<div style="background:#fffbeb;border:1px solid #fef3c7;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#92400e;"><strong>📝 備註：</strong>${c.notes}</div>`:''}
+    ${certHtml}
     <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#2d3748;">費用 &amp; 收款明細</div>
     <table class="fee-table"><thead><tr><th>日期</th><th>類型</th><th>說明</th><th>代墊</th><th>收回</th><th>憑證</th></tr></thead>
     <tbody>${feeRows}</tbody>
@@ -890,182 +906,194 @@ function viewDetail(id) {
   openModal('detail-modal');
 }
 
-// 代墊費用
-function refreshCaseSel(selId, includeAll=false) {
-  const cases = loadCases();
-  const list = includeAll ? cases : cases.filter(c => c.stage !== '結案');
-  document.getElementById(selId).innerHTML = list.map(c => `<option value="${c.id}">${c.id} ${c.name}</option>`).join('');
+// ── 費用相關 ──────────────────────────────────────
+function refreshCaseSel(selId) {
+  const cases=loadCases().filter(c=>c.stage!=='結案');
+  document.getElementById(selId).innerHTML=cases.map(c=>`<option value="${c.id}">${c.id} ${c.name}</option>`).join('');
 }
-function openAddFee() {
-  refreshCaseSel('ff-case');
-  document.getElementById('ff-date').value = today();
-  ['ff-amount','ff-desc','ff-receipt'].forEach(id => document.getElementById(id).value = '');
-  openModal('fee-modal');
-}
+function openAddFee() { refreshCaseSel('ff-case'); document.getElementById('ff-date').value=today(); ['ff-amount','ff-desc','ff-receipt'].forEach(id=>document.getElementById(id).value=''); openModal('fee-modal'); }
 function saveFee() {
-  const caseId = document.getElementById('ff-case').value;
-  const amount = Number(document.getElementById('ff-amount').value)||0;
-  if (!caseId) { alert('請選擇關聯案件'); return; }
-  if (!amount) { alert('請輸入費用金額'); return; }
-  const fees = loadFees();
-  fees.push({ id:'F'+Date.now(), caseId, date:document.getElementById('ff-date').value, type:document.getElementById('ff-type').value,
-    desc:document.getElementById('ff-desc').value.trim(), amount, pay:document.getElementById('ff-pay').value,
-    receipt:document.getElementById('ff-receipt').value.trim(), isPayment:false });
-  saveFees(fees);
-  closeModal('fee-modal');
-  refresh();
+  const caseId=document.getElementById('ff-case').value, amount=Number(document.getElementById('ff-amount').value)||0;
+  if(!caseId){alert('請選擇關聯案件');return;} if(!amount){alert('請輸入費用金額');return;}
+  loadFees().push; const fees=loadFees();
+  fees.push({id:'F'+Date.now(),caseId,date:document.getElementById('ff-date').value,type:document.getElementById('ff-type').value,desc:document.getElementById('ff-desc').value.trim(),amount,pay:document.getElementById('ff-pay').value,receipt:document.getElementById('ff-receipt').value.trim(),isPayment:false});
+  saveFees(fees); closeModal('fee-modal'); refresh();
 }
-
-// 收款沖銷
-function openAddPayment() {
-  refreshCaseSel('fp-case');
-  document.getElementById('fp-date').value = today();
-  ['fp-amount','fp-desc','fp-ref'].forEach(id => document.getElementById(id).value = '');
-  updatePaymentBalance();
-  openModal('payment-modal');
-}
-function openAddPaymentFor(caseId) {
-  openAddPayment();
-  const sel = document.getElementById('fp-case');
-  for (let i=0;i<sel.options.length;i++) { if (sel.options[i].value===caseId) { sel.selectedIndex=i; break; } }
-  updatePaymentBalance();
-}
+function openAddPayment() { refreshCaseSel('fp-case'); document.getElementById('fp-date').value=today(); ['fp-amount','fp-desc','fp-ref'].forEach(id=>document.getElementById(id).value=''); updatePaymentBalance(); openModal('payment-modal'); }
+function openAddPaymentFor(caseId) { openAddPayment(); const sel=document.getElementById('fp-case'); for(let i=0;i<sel.options.length;i++){if(sel.options[i].value===caseId){sel.selectedIndex=i;break;}} updatePaymentBalance(); }
 function updatePaymentBalance() {
-  const caseId = document.getElementById('fp-case').value;
-  const inputAmt = Number(document.getElementById('fp-amount').value)||0;
-  if (!caseId) { document.getElementById('fp-balance-hint').textContent=''; return; }
-  const { totalOut, totalIn, net } = caseFeesSummary(caseId);
-  const afterNet = net - inputAmt;
-  let hint = `此案目前淨墊款：${fmtM(net)}`;
-  if (inputAmt > 0) hint += `　→　收款後淨餘：${fmtM(Math.max(0,afterNet))}`;
-  if (inputAmt > net) hint += `　⚠️ 收款金額超過淨墊款`;
-  document.getElementById('fp-balance-hint').textContent = hint;
+  const caseId=document.getElementById('fp-case').value, inputAmt=Number(document.getElementById('fp-amount').value)||0;
+  if(!caseId){document.getElementById('fp-balance-hint').textContent='';return;}
+  const {net}=caseFeesSummary(caseId);
+  let hint=`此案目前淨墊款：${fmtM(net)}`;
+  if(inputAmt>0) hint+=`　→　收款後淨餘：${fmtM(Math.max(0,net-inputAmt))}`;
+  if(inputAmt>net) hint+=`　⚠️ 收款金額超過淨墊款`;
+  document.getElementById('fp-balance-hint').textContent=hint;
 }
 function savePayment() {
-  const caseId = document.getElementById('fp-case').value;
-  const amount = Number(document.getElementById('fp-amount').value)||0;
-  if (!caseId) { alert('請選擇關聯案件'); return; }
-  if (!amount) { alert('請輸入收款金額'); return; }
-  const fees = loadFees();
-  fees.push({ id:'P'+Date.now(), caseId, date:document.getElementById('fp-date').value, type:'收款沖銷',
-    desc:document.getElementById('fp-desc').value.trim()||'借款方協商匯款', amount, pay:document.getElementById('fp-pay').value,
-    receipt:document.getElementById('fp-ref').value.trim(), isPayment:true });
-  saveFees(fees);
-  closeModal('payment-modal');
-  refresh();
+  const caseId=document.getElementById('fp-case').value, amount=Number(document.getElementById('fp-amount').value)||0;
+  if(!caseId){alert('請選擇關聯案件');return;} if(!amount){alert('請輸入收款金額');return;}
+  const fees=loadFees();
+  fees.push({id:'P'+Date.now(),caseId,date:document.getElementById('fp-date').value,type:'收款沖銷',desc:document.getElementById('fp-desc').value.trim()||'借款方協商匯款',amount,pay:document.getElementById('fp-pay').value,receipt:document.getElementById('fp-ref').value.trim(),isPayment:true});
+  saveFees(fees); closeModal('payment-modal'); refresh();
 }
-
 function deleteFee(id) {
-  const f = loadFees().find(x => x.id === id);
-  if (!confirm(`確定刪除此${f&&f.isPayment?'收款':'費用'}記錄？`)) return;
-  saveFees(loadFees().filter(x => x.id !== id));
-  refresh();
+  const f=loadFees().find(x=>x.id===id);
+  if(!confirm(`確定刪除此${f&&f.isPayment?'收款':'費用'}記錄？`)) return;
+  saveFees(loadFees().filter(x=>x.id!==id)); refresh();
 }
 
-// ── 匯出 CSV ──────────────────────────────────────────
-function exportExcel() {
-  const cases = loadCases();
-  const fees  = loadFees();
-  const escape = v => `"${String(v).replace(/"/g,'""')}"`;
+// ── 年度調閱 ──────────────────────────────────────
+function refreshReviewCaseSel(selId, caseId='') {
+  const cases=loadCases().filter(c=>c.stage==='債權憑證');
+  document.getElementById(selId).innerHTML=cases.map(c=>`<option value="${c.id}" ${c.id===caseId?'selected':''}>${c.id} ${c.name}</option>`).join('');
+}
+function fillYearSelect(selId) {
+  const cur=thisYear();
+  const opts=[]; for(let y=cur;y>=cur-10;y--) opts.push(y);
+  document.getElementById(selId).innerHTML=opts.map(y=>`<option value="${y}">${y}</option>`).join('');
+}
+function openAddReview() {
+  refreshReviewCaseSel('fr-case'); fillYearSelect('fr-year');
+  document.getElementById('review-modal-title').textContent='新增年度調閱記錄';
+  ['fr-taxdate','fr-reviewdate'].forEach(id=>document.getElementById(id).value='');
+  ['fr-property','fr-income','fr-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('fr-execfee').value='';
+  document.getElementById('fr-asset').value='無';
+  document.getElementById('fr-action').value='繼續監控（明年再調閱）';
+  openModal('review-modal');
+}
+function openAddReviewFor(caseId) {
+  openAddReview();
+  refreshReviewCaseSel('fr-case', caseId);
+}
+function saveReview() {
+  const caseId=document.getElementById('fr-case').value;
+  if(!caseId){alert('請選擇關聯案件');return;}
+  const year=Number(document.getElementById('fr-year').value);
+  const reviews=loadReviews();
+  const rec={
+    id:'R'+Date.now(), caseId, year,
+    taxdate:document.getElementById('fr-taxdate').value,
+    reviewdate:document.getElementById('fr-reviewdate').value,
+    property:document.getElementById('fr-property').value.trim(),
+    income:document.getElementById('fr-income').value.trim(),
+    asset:document.getElementById('fr-asset').value,
+    action:document.getElementById('fr-action').value,
+    execfee:Number(document.getElementById('fr-execfee').value)||0,
+    notes:document.getElementById('fr-notes').value.trim(),
+  };
+  reviews.push(rec);
+  // 若決定再執行且有填費用，自動新增費用記錄
+  if(rec.action==='聲請再執行'&&rec.execfee>0) {
+    const fees=loadFees();
+    fees.push({id:'F'+Date.now(),caseId,date:rec.reviewdate||today(),type:'執行費',desc:`${year}年度再執行費用`,amount:rec.execfee,pay:'公司代墊',receipt:'',isPayment:false});
+    saveFees(fees);
+  }
+  saveReviews(reviews); closeModal('review-modal'); refresh();
+  alert(`✅ ${year} 年度調閱記錄已儲存${rec.action==='聲請再執行'&&rec.execfee>0?'\n再執行費用已自動記錄至費用明細。':''}`)
+}
+function deleteReview(id) {
+  if(!confirm('確定刪除此年度調閱記錄？')) return;
+  saveReviews(loadReviews().filter(r=>r.id!==id)); refresh();
+  if(document.getElementById('tab-reviews').classList.contains('active')) renderReviewsTab();
+}
 
-  const caseHeaders = ['案件編號','登記日','借款人','身分證','逾期金額','逾期天數','催收階段','委辦律師/機構','管轄法院','案件字號','代墊費用合計','已收回合計','淨墊款','GD連結','備註'];
-  const caseRows = cases.map(c => {
-    const { totalOut, totalIn, net } = caseFeesSummary(c.id);
-    return [c.id,c.date,c.name,c.idno||'',c.amount,c.days||0,c.stage,c.lawyer||'',c.court||'',c.casenumber||'',totalOut,totalIn,net,c.gdlink||'',c.notes||''];
+// ── 匯出 CSV ─────────────────────────────────────
+function exportExcel() {
+  const cases=loadCases(), fees=loadFees(), reviews=loadReviews();
+  const esc=v=>`"${String(v).replace(/"/g,'""')}"`;
+
+  const caseHeaders=['案件編號','登記日','借款人','身分證','逾期金額','逾期天數','催收階段','委辦律師/機構','管轄法院','案件字號','代墊費用合計','已收回合計','淨墊款','債權憑證調閱次數','GD連結','備註'];
+  const caseRows=cases.map(c=>{
+    const {totalOut,totalIn,net}=caseFeesSummary(c.id);
+    const certCnt=reviews.filter(r=>r.caseId===c.id).length;
+    return [c.id,c.date,c.name,c.idno||'',c.amount,c.days||0,c.stage,c.lawyer||'',c.court||'',c.casenumber||'',totalOut,totalIn,net,certCnt,c.gdlink||'',c.notes||''];
   });
 
-  const feeHeaders = ['類型','日期','案件編號','借款人','費用/收款類別','說明','代墊金額','收款金額','付款/收款方式','憑證'];
-  const feeRows = fees.map(f => {
-    const c = cases.find(c => c.id === f.caseId);
+  const feeHeaders=['類型','日期','案件編號','借款人','費用類別','說明','代墊金額','收款金額','付款方式','憑證'];
+  const feeRows=fees.map(f=>{
+    const c=cases.find(c=>c.id===f.caseId);
     return [f.isPayment?'收款沖銷':'代墊費用',f.date,f.caseId,c?c.name:'',f.type,f.desc,f.isPayment?'':f.amount,f.isPayment?f.amount:'',f.pay,f.receipt||''];
   });
 
-  let csv = '﻿';
-  csv += '=== 案件清單 ===\n' + caseHeaders.map(escape).join(',') + '\n';
-  caseRows.forEach(r => { csv += r.map(escape).join(',') + '\n'; });
-  csv += '\n=== 費用與收款明細 ===\n' + feeHeaders.map(escape).join(',') + '\n';
-  feeRows.forEach(r => { csv += r.map(escape).join(',') + '\n'; });
+  const revHeaders=['案件編號','借款人','年度','綜所稅申報完成日','調閱日期','財產清冊結果','所得清冊結果','有無可執行資產','後續處置','再執行費用','備註'];
+  const revRows=reviews.map(r=>{
+    const c=cases.find(c=>c.id===r.caseId);
+    return [r.caseId,c?c.name:'',r.year,r.taxdate||'',r.reviewdate||'',r.property||'',r.income||'',r.asset,r.action,r.execfee||0,r.notes||''];
+  });
 
-  const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `催收案件_${today()}.csv`;
-  a.click();
+  let csv='﻿';
+  csv+='=== 案件清單 ===\n'+caseHeaders.map(esc).join(',')+'\n';
+  caseRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
+  csv+='\n=== 費用與收款明細 ===\n'+feeHeaders.map(esc).join(',')+'\n';
+  feeRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
+  csv+='\n=== 債權憑證年度調閱記錄 ===\n'+revHeaders.map(esc).join(',')+'\n';
+  revRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
+
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`催收案件_${today()}.csv`; a.click();
 }
 
-// ── 整體刷新 ──────────────────────────────────────────
+// ── 整體刷新 ──────────────────────────────────────
 function refresh() {
-  renderStats();
-  renderCharts();
-  renderTable();
-  if (document.getElementById('tab-fees').classList.contains('active')) renderFeeTable();
+  renderStats(); renderCharts(); renderTable();
+  if(document.getElementById('tab-fees').classList.contains('active')) renderFeeTable();
+  if(document.getElementById('tab-reviews').classList.contains('active')) renderReviewsTab();
 }
 
-document.querySelectorAll('.modal-overlay').forEach(el => {
-  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('active'); });
+document.querySelectorAll('.modal-overlay').forEach(el=>{
+  el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('active');});
 });
-document.getElementById('fp-case').addEventListener('change', updatePaymentBalance);
+document.getElementById('fp-case').addEventListener('change',updatePaymentBalance);
 
-// ── Firebase Auth ────────────────────────────────────
-const ALLOWED_DOMAIN = 'bznk.com';
-
-const firebaseConfig = {
-  apiKey: "AIzaSyABE2WF_YQ7Gx3VOjHe9sy1pjmdrIm0Gwg",
-  authDomain: "bznk-collection.firebaseapp.com",
-  projectId: "bznk-collection",
-  storageBucket: "bznk-collection.firebasestorage.app",
-  messagingSenderId: "964066201466",
-  appId: "1:964066201466:web:0f5a63bc1d902c068fd0c3",
-  measurementId: "G-7LTEBFE7QZ"
+// ── Firebase Auth ─────────────────────────────────
+const ALLOWED_DOMAIN='bznk.com';
+const firebaseConfig={
+  apiKey:"AIzaSyABE2WF_YQ7Gx3VOjHe9sy1pjmdrIm0Gwg",
+  authDomain:"bznk-collection.firebaseapp.com",
+  projectId:"bznk-collection",
+  storageBucket:"bznk-collection.firebasestorage.app",
+  messagingSenderId:"964066201466",
+  appId:"1:964066201466:web:0f5a63bc1d902c068fd0c3",
+  measurementId:"G-7LTEBFE7QZ"
 };
-
 firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const provider = new firebase.auth.GoogleAuthProvider();
-provider.setCustomParameters({ hd: ALLOWED_DOMAIN }); // 預設建議公司帳號
+const auth=firebase.auth();
+const provider=new firebase.auth.GoogleAuthProvider();
+provider.setCustomParameters({hd:ALLOWED_DOMAIN});
 
 function signIn() {
-  document.getElementById('login-err').style.display = 'none';
-  document.getElementById('login-loading').style.display = 'block';
-  auth.signInWithPopup(provider)
-    .then(result => {
-      const email = result.user.email;
-      if (!email.endsWith('@' + ALLOWED_DOMAIN)) {
-        auth.signOut();
-        document.getElementById('login-loading').style.display = 'none';
-        document.getElementById('login-err').style.display = 'block';
-      }
-    })
-    .catch(err => {
-      document.getElementById('login-loading').style.display = 'none';
-      if (err.code !== 'auth/popup-closed-by-user') {
-        document.getElementById('login-err').style.display = 'block';
-        document.getElementById('login-err').textContent = '登入失敗：' + err.message;
-      }
-    });
+  document.getElementById('login-err').style.display='none';
+  document.getElementById('login-loading').style.display='block';
+  auth.signInWithPopup(provider).then(result=>{
+    if(!result.user.email.endsWith('@'+ALLOWED_DOMAIN)){
+      auth.signOut();
+      document.getElementById('login-loading').style.display='none';
+      document.getElementById('login-err').style.display='block';
+    }
+  }).catch(err=>{
+    document.getElementById('login-loading').style.display='none';
+    if(err.code!=='auth/popup-closed-by-user'){
+      document.getElementById('login-err').style.display='block';
+      document.getElementById('login-err').textContent='登入失敗：'+err.message;
+    }
+  });
 }
+function signOut(){auth.signOut();}
 
-function signOut() {
-  auth.signOut();
-}
-
-auth.onAuthStateChanged(user => {
-  const wall = document.getElementById('auth-wall');
-  const chip = document.getElementById('user-chip');
-  if (user && user.email.endsWith('@' + ALLOWED_DOMAIN)) {
-    // 驗證通過：隱藏登入牆，顯示系統
-    wall.classList.add('hidden');
-    chip.style.display = 'flex';
-    document.getElementById('user-name').textContent = user.displayName || user.email;
-    document.getElementById('user-photo').src = user.photoURL || '';
-    document.getElementById('user-photo').style.display = user.photoURL ? 'block' : 'none';
-    seedData();
-    refresh();
+auth.onAuthStateChanged(user=>{
+  const wall=document.getElementById('auth-wall'), chip=document.getElementById('user-chip');
+  if(user&&user.email.endsWith('@'+ALLOWED_DOMAIN)){
+    wall.classList.add('hidden'); chip.style.display='flex';
+    document.getElementById('user-name').textContent=user.displayName||user.email;
+    document.getElementById('user-photo').src=user.photoURL||'';
+    document.getElementById('user-photo').style.display=user.photoURL?'block':'none';
+    seedData(); refresh();
   } else {
-    // 未登入或非公司帳號：顯示登入牆
-    wall.classList.remove('hidden');
-    chip.style.display = 'none';
-    document.getElementById('login-loading').style.display = 'none';
+    wall.classList.remove('hidden'); chip.style.display='none';
+    document.getElementById('login-loading').style.display='none';
   }
 });
 </script>
