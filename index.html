@@ -890,7 +890,11 @@ function viewDetail(id) {
       <div class="offset-box in"><div class="label">📥 已收回</div><div class="value">${fmtM(totalIn)}</div></div>
       <div class="offset-box net"><div class="label">⚖️ 淨墊款餘額</div><div class="value">${fmtM(net)}</div></div>
     </div>
-    ${c.gdlink?`<div class="gd-note">📂 <a href="${c.gdlink}" target="_blank" style="color:#2b6cb0;">開啟 Google Drive 法院文件資料夾</a></div>`:''}
+    ${c.gdlink?`<div class="gd-note" style="justify-content:space-between;">
+      <span>📂 <a href="${c.gdlink}" target="_blank" style="color:#2b6cb0;font-weight:600;">開啟 Google Drive 法院文件資料夾</a></span>
+      <button class="btn btn-outline btn-sm" onclick="syncDriveFiles('${c.id}','${c.gdlink}')" style="font-size:12px;">🔄 同步文件清單</button>
+    </div>
+    <div id="drive-files-${c.id}" style="display:none;"></div>`:''}
     ${c.notes?`<div style="background:#fffbeb;border:1px solid #fef3c7;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#92400e;"><strong>📝 備註：</strong>${c.notes}</div>`:''}
     ${certHtml}
     <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#2d3748;">費用 &amp; 收款明細</div>
@@ -1048,6 +1052,107 @@ document.querySelectorAll('.modal-overlay').forEach(el=>{
 });
 document.getElementById('fp-case').addEventListener('change',updatePaymentBalance);
 
+
+// ── Google Drive 文件清單 ──────────────────────────
+function extractFolderId(url) {
+  if (!url) return null;
+  // https://drive.google.com/drive/folders/FOLDER_ID
+  // https://drive.google.com/drive/u/0/folders/FOLDER_ID
+  const m = url.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  return m ? m[1] : null;
+}
+
+function parseDocName(filename) {
+  // 格式：20240315_臺北地院開庭通知.pdf 或 2024-03-15_主旨.pdf
+  const name = filename.replace(/\.pdf$/i,'').replace(/\.PDF$/,'');
+  const m = name.match(/^(\d{4}[-_]?\d{2}[-_]?\d{2})[-_](.+)$/);
+  if (m) {
+    const raw = m[1].replace(/[-_]/g,'');
+    const y=raw.slice(0,4), mo=raw.slice(4,6), d=raw.slice(6,8);
+    return { date:`${y}/${mo}/${d}`, subject:m[2], full:filename };
+  }
+  return { date:'—', subject:name, full:filename };
+}
+
+async function syncDriveFiles(caseId, folderUrl) {
+  const el = document.getElementById('drive-files-'+caseId);
+  if (!el) return;
+
+  if (!window._driveToken) {
+    el.style.display='block';
+    el.innerHTML=`<div style="background:#fff5f5;border:1px solid #fed7d7;border-radius:8px;padding:14px 16px;font-size:13px;color:#c53030;margin-bottom:12px;">
+      ⚠️ Drive 存取權限已過期（Token 約 1 小時有效）。<br>請<button onclick="auth.signOut()" style="background:none;border:none;color:#3182ce;cursor:pointer;font-size:13px;text-decoration:underline;">登出後重新登入</button>即可重新取得。
+    </div>`;
+    return;
+  }
+
+  const folderId = extractFolderId(folderUrl);
+  if (!folderId) {
+    el.style.display='block';
+    el.innerHTML=`<div style="background:#fff5f5;border:1px solid #fed7d7;border-radius:8px;padding:12px 16px;font-size:13px;color:#c53030;margin-bottom:12px;">⚠️ 無法解析 Google Drive 資料夾連結，請確認連結格式正確。</div>`;
+    return;
+  }
+
+  el.style.display='block';
+  el.innerHTML=`<div style="background:#ebf8ff;border:1px solid #bee3f8;border-radius:8px;padding:12px 16px;font-size:13px;color:#2b6cb0;margin-bottom:12px;">⏳ 讀取文件清單中…</div>`;
+
+  try {
+    const q = encodeURIComponent(`'${folderId}' in parents and mimeType='application/pdf' and trashed=false`);
+    const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(name,createdTime,id)&orderBy=createdTime desc&pageSize=50`;
+    const res = await fetch(url, { headers:{ Authorization:'Bearer '+window._driveToken } });
+    if (!res.ok) throw new Error(res.status===401?'Token 已過期':'API 錯誤 '+res.status);
+    const data = await res.json();
+    const files = data.files||[];
+
+    if (files.length===0) {
+      el.innerHTML=`<div style="background:#f7fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;font-size:13px;color:#718096;margin-bottom:12px;text-align:center;">此資料夾目前無 PDF 文件</div>`;
+      return;
+    }
+
+    const parsed = files.map(f=>({...parseDocName(f.name), id:f.id, createdTime:f.createdTime}));
+    el.innerHTML=`
+      <div style="background:white;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:12px;">
+        <div style="background:#f7fafc;padding:10px 14px;font-size:12px;font-weight:700;color:#2d3748;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+          <span>📄 GD 文件清單（${files.length} 筆 PDF）</span>
+          <span style="font-size:11px;color:#a0aec0;font-weight:400;">點擊檔名可貼入備註</span>
+        </div>
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr>
+            <th style="padding:8px 14px;text-align:left;font-size:11px;color:#718096;border-bottom:1px solid #f0f4f8;white-space:nowrap;">文件日期</th>
+            <th style="padding:8px 14px;text-align:left;font-size:11px;color:#718096;border-bottom:1px solid #f0f4f8;">文件主旨</th>
+            <th style="padding:8px 14px;text-align:left;font-size:11px;color:#718096;border-bottom:1px solid #f0f4f8;white-space:nowrap;">操作</th>
+          </tr></thead>
+          <tbody>
+            ${parsed.map(p=>`<tr style="border-bottom:1px solid #f7fafc;">
+              <td style="padding:8px 14px;font-size:12px;color:#718096;white-space:nowrap;">${p.date}</td>
+              <td style="padding:8px 14px;font-size:13px;font-weight:500;color:#2d3748;">${p.subject}</td>
+              <td style="padding:8px 14px;">
+                <button class="btn btn-outline btn-sm" onclick="appendToNotes('${caseId}','${p.date} ${p.subject}')" title="貼入備註">＋備註</button>
+              </td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  } catch(e) {
+    el.innerHTML=`<div style="background:#fff5f5;border:1px solid #fed7d7;border-radius:8px;padding:12px 16px;font-size:13px;color:#c53030;margin-bottom:12px;">⚠️ 讀取失敗：${e.message}。請重新登入後再試。</div>`;
+  }
+}
+
+function appendToNotes(caseId, text) {
+  const cases = loadCases();
+  const c = cases.find(x=>x.id===caseId);
+  if (!c) return;
+  const now = today();
+  const newLine = `[${now}] 收到文件：${text}`;
+  c.notes = c.notes ? c.notes+'\n'+newLine : newLine;
+  saveCases(cases);
+  // 更新詳情頁的備註顯示
+  const notesEl = document.querySelector('#detail-content [data-notes]');
+  if (notesEl) notesEl.textContent = c.notes;
+  alert(`✅ 已貼入備註：${newLine}`);
+  refresh();
+}
+
 // ── Firebase Auth ─────────────────────────────────
 const ALLOWED_DOMAIN='bznk.com';
 const firebaseConfig={
@@ -1063,6 +1168,8 @@ firebase.initializeApp(firebaseConfig);
 const auth=firebase.auth();
 const provider=new firebase.auth.GoogleAuthProvider();
 provider.setCustomParameters({hd:ALLOWED_DOMAIN});
+provider.addScope('https://www.googleapis.com/auth/drive.readonly');
+window._driveToken=null; // 儲存 Drive access token
 
 function signIn() {
   document.getElementById('login-err').style.display='none';
@@ -1072,6 +1179,9 @@ function signIn() {
       auth.signOut();
       document.getElementById('login-loading').style.display='none';
       document.getElementById('login-err').style.display='block';
+    } else {
+      // 保存 Google access token 供 Drive API 使用
+      window._driveToken = result.credential ? result.credential.accessToken : null;
     }
   }).catch(err=>{
     document.getElementById('login-loading').style.display='none';
