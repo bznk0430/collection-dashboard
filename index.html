@@ -1063,14 +1063,37 @@ function extractFolderId(url) {
 }
 
 function parseDocName(filename) {
-  // 格式：20240315_臺北地院開庭通知.pdf 或 2024-03-15_主旨.pdf
-  const name = filename.replace(/\.pdf$/i,'').replace(/\.PDF$/,'');
-  const m = name.match(/^(\d{4}[-_]?\d{2}[-_]?\d{2})[-_](.+)$/);
-  if (m) {
-    const raw = m[1].replace(/[-_]/g,'');
-    const y=raw.slice(0,4), mo=raw.slice(4,6), d=raw.slice(6,8);
-    return { date:`${y}/${mo}/${d}`, subject:m[2], full:filename };
+  const name = filename.replace(/\.pdf$/i,'');
+
+  function fmtRoc(y,mo,d) {
+    return `民國${y}年${mo.padStart(2,'0')}月${d.padStart(2,'0')}日`;
   }
+
+  let m;
+
+  // ── 日期在開頭 ──────────────────────────────────
+  // 有點：114.03.15_ 或 114.3.15_
+  m = name.match(/^(\d{3})\.(\d{1,2})\.(\d{1,2})[_\s-]?(.*)$/);
+  if (m) return { date:fmtRoc(m[1],m[2],m[3]), subject:m[4]||name, full:filename };
+
+  // 無點7碼：1150529_ 或 1150529空格 或 1150529-
+  m = name.match(/^(\d{3})(\d{2})(\d{2})[_\s-]+(.+)$/);
+  if (m) return { date:fmtRoc(m[1],m[2],m[3]), subject:m[4], full:filename };
+
+  // 無點7碼、無分隔符（全數字開頭後直接接文字）
+  m = name.match(/^(\d{3})(\d{2})(\d{2})([^\d].*)$/);
+  if (m) return { date:fmtRoc(m[1],m[2],m[3]), subject:m[4], full:filename };
+
+  // ── 日期在結尾 ──────────────────────────────────
+  // 結尾有點：主旨115.02.26
+  m = name.match(/^(.+?)(\d{3})\.(\d{1,2})\.(\d{1,2})$/);
+  if (m) return { date:fmtRoc(m[2],m[3],m[4]), subject:m[1].replace(/[_\s-]+$/,''), full:filename };
+
+  // 結尾7碼無點：主旨_1141120 或 主旨1141120
+  m = name.match(/^(.+?)[_\s-]?(\d{3})(\d{2})(\d{2})$/);
+  if (m) return { date:fmtRoc(m[2],m[3],m[4]), subject:m[1].replace(/[_\s-]+$/,''), full:filename };
+
+  // ── 無日期 ──────────────────────────────────────
   return { date:'—', subject:name, full:filename };
 }
 
