@@ -378,7 +378,7 @@
     <div class="modal-title"><span id="modal-title-text">新增催收案件</span><button class="modal-close" onclick="closeModal('case-modal')">✕</button></div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">案件編號</label><input class="form-control" id="f-id" placeholder="自動生成或手動輸入" /></div>
-      <div class="form-group"><label class="form-label">登記日期</label><input class="form-control" type="date" id="f-date" /></div>
+      <div class="form-group"><label class="form-label">登記日期</label><input class="form-control" type="date" id="f-date" onchange="document.getElementById('f-days-display').value=this.value?calcDays(this.value)+' 天':''" /></div>
     </div>
     <!-- 借款人類型 -->
     <div class="form-group">
@@ -405,7 +405,7 @@
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">逾期金額（元）</label><input class="form-control" type="number" id="f-amount" placeholder="0" /></div>
-      <div class="form-group"><label class="form-label">逾期天數</label><input class="form-control" type="number" id="f-days" placeholder="0" /></div>
+      <div class="form-group"><label class="form-label">逾期天數</label><input class="form-control" id="f-days-display" readonly style="background:#f7fafc;color:#718096;cursor:default;" placeholder="依登記日期自動計算" /></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">催收階段</label>
@@ -570,6 +570,13 @@ function genId() {
 function fmtMoney(n) { return Number(n||0).toLocaleString('zh-TW') + ' 元'; }
 function fmtM(n) { return '$' + Number(n||0).toLocaleString('zh-TW'); }
 function today() { return new Date().toISOString().split('T')[0]; }
+function calcDays(dateStr) {
+  if (!dateStr) return 0;
+  const start = new Date(dateStr);
+  const now = new Date();
+  now.setHours(0,0,0,0); start.setHours(0,0,0,0);
+  return Math.max(0, Math.round((now - start) / 86400000));
+}
 function thisYear() { return new Date().getFullYear(); }
 
 // ── 初始資料 ──────────────────────────────────────
@@ -688,7 +695,7 @@ function renderTable() {
     return `<tr style="border-bottom:1px solid #f0f4f8;${rowBg}">
       <td style="padding:10px 12px;font-size:12px;font-family:monospace;color:#4a5568;">${c.id}</td>
       <td style="padding:10px 12px;font-weight:600;">${c.name} <span class="badge badge-${c.borrowerType||'自然人'}" style="font-size:10px;">${c.borrowerType==='法人'?'法人':'自然人'}</span>${isCert?` <span style="font-size:10px;color:#6b46c1;font-weight:600;">📅${certCount}次</span>`:''}</td>
-      <td style="padding:10px 12px;color:#c53030;font-weight:600;">${fmtM(c.amount)}</td>
+      <td style="padding:10px 12px;color:#c53030;font-weight:600;">${fmtM(c.amount)}<br><span style='font-size:11px;color:#718096;font-weight:400;'>逾期 ${calcDays(c.date)} 天</span></td>
       <td style="padding:10px 12px;"><span class="badge badge-${c.stage}">${c.stage}</span></td>
       <td style="padding:10px 12px;font-size:12px;color:#4a5568;">${c.lawyer||'—'}</td>
       <td style="padding:10px 12px;font-size:12px;color:#4a5568;">${c.court||'—'}</td>
@@ -886,7 +893,8 @@ function openAddCase() {
   document.getElementById('modal-title-text').textContent='新增催收案件';
   document.getElementById('f-id').value=genId();
   document.getElementById('f-date').value=today();
-  ['f-name','f-idno','f-amount','f-days','f-court','f-lawyer','f-casenumber','f-gdlink','f-notes'].forEach(id=>document.getElementById(id).value='');
+  ['f-name','f-idno','f-amount','f-court','f-lawyer','f-casenumber','f-gdlink','f-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-days-display').value='';
   document.getElementById('f-stage').value='存證信函';
   document.getElementById('f-btype-person').checked=true;
   onBorrowerTypeChange();
@@ -899,7 +907,7 @@ function editCase(id) {
   document.getElementById('modal-title-text').textContent='編輯催收案件';
   document.getElementById('f-id').value=c.id; document.getElementById('f-date').value=c.date;
   document.getElementById('f-name').value=c.name; document.getElementById('f-idno').value=c.idno||'';
-  document.getElementById('f-amount').value=c.amount; document.getElementById('f-days').value=c.days||'';
+  document.getElementById('f-amount').value=c.amount; document.getElementById('f-days-display').value=calcDays(c.date)+' 天';
   document.getElementById('f-stage').value=c.stage; document.getElementById('f-court').value=c.court||'';
   document.getElementById('f-lawyer').value=c.lawyer||''; document.getElementById('f-casenumber').value=c.casenumber||'';
   document.getElementById('f-gdlink').value=c.gdlink||''; document.getElementById('f-notes').value=c.notes||'';
@@ -917,7 +925,7 @@ function saveCase() {
     id:document.getElementById('f-id').value.trim(), date:document.getElementById('f-date').value,
     name:document.getElementById('f-name').value.trim(), idno:document.getElementById('f-idno').value.trim(),
     borrowerType, guarantors:getGuarantors(),
-    amount:Number(document.getElementById('f-amount').value)||0, days:Number(document.getElementById('f-days').value)||0,
+    amount:Number(document.getElementById('f-amount').value)||0, days:calcDays(document.getElementById('f-date').value),
     stage:document.getElementById('f-stage').value, court:document.getElementById('f-court').value.trim(),
     lawyer:document.getElementById('f-lawyer').value.trim(), casenumber:document.getElementById('f-casenumber').value.trim(),
     gdlink:document.getElementById('f-gdlink').value.trim(), notes:document.getElementById('f-notes').value.trim(),
@@ -984,7 +992,7 @@ function viewDetail(id) {
         <div class="value">${c.name} <span class="badge badge-${c.borrowerType||'自然人'}" style="margin-left:4px;">${c.borrowerType==='法人'?'🏢 法人':'👤 自然人'}</span></div>
       </div>
       <div class="detail-item"><div class="label">${c.borrowerType==='法人'?'統一編號':'身分證字號'}</div><div class="value" style="font-family:monospace;">${c.idno||'—'}</div></div>
-      <div class="detail-item"><div class="label">逾期金額</div><div class="value" style="color:#c53030;">${fmtMoney(c.amount)}</div></div>
+      <div class="detail-item"><div class="label">逾期金額</div><div class="value" style="color:#c53030;">${fmtMoney(c.amount)}<span style="font-size:12px;color:#718096;font-weight:400;margin-left:8px;">逾期 ${calcDays(c.date)} 天</span></div></div>
       <div class="detail-item"><div class="label">催收階段</div><div class="value"><span class="badge badge-${c.stage}">${c.stage}</span></div></div>
       <div class="detail-item"><div class="label">管轄法院</div><div class="value">${c.court||'—'}</div></div>
       <div class="detail-item"><div class="label">案件字號</div><div class="value" style="font-size:12px;">${c.casenumber||'—'}</div></div>
@@ -1124,7 +1132,7 @@ function exportExcel() {
     const {totalOut,totalIn,net}=caseFeesSummary(c.id);
     const certCnt=reviews.filter(r=>r.caseId===c.id).length;
     const gList=(c.guarantors||[]).map(g=>`${g.type} ${g.name}${g.idno?'('+g.idno+')':''}`).join('；');
-    return [c.id,c.date,c.borrowerType||'自然人',c.name,c.idno||'',c.amount,c.days||0,c.stage,c.lawyer||'',c.court||'',c.casenumber||'',gList,totalOut,totalIn,net,certCnt,c.gdlink||'',c.notes||''];
+    return [c.id,c.date,c.borrowerType||'自然人',c.name,c.idno||'',c.amount,calcDays(c.date),c.stage,c.lawyer||'',c.court||'',c.casenumber||'',gList,totalOut,totalIn,net,certCnt,c.gdlink||'',c.notes||''];
   });
 
   const feeHeaders=['類型','日期','案件編號','借款人','費用類別','說明','代墊金額','收款金額','付款方式','憑證'];
