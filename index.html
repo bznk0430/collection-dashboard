@@ -136,6 +136,17 @@
   .stage-step:not(.done):not(.current):not(.current-cert)::after { border-left: 7px solid #e2e8f0; }
 
   .empty-state { text-align: center; padding: 40px; color: #a0aec0; }
+
+  /* 借款人類型 & 連保人 */
+  .type-toggle { display:flex; gap:0; border:1px solid #e2e8f0; border-radius:6px; overflow:hidden; }
+  .type-toggle label { flex:1; text-align:center; padding:7px 0; font-size:13px; font-weight:500; cursor:pointer; color:#718096; background:white; transition:all 0.15s; }
+  .type-toggle input[type=radio] { display:none; }
+  .type-toggle input[type=radio]:checked + label { background:#3182ce; color:white; }
+  .badge-自然人 { background:#e6fffa; color:#234e52; }
+  .badge-法人   { background:#ebf4ff; color:#2a4365; }
+  .guarantor-row { display:grid; grid-template-columns:auto 1fr 1fr auto; gap:8px; align-items:center; background:#f7fafc; border:1px solid #e2e8f0; border-radius:6px; padding:8px 10px; margin-bottom:6px; }
+  .guarantor-row select, .guarantor-row input { padding:5px 8px; border:1px solid #e2e8f0; border-radius:5px; font-size:12px; color:#2d3748; outline:none; }
+  .guarantor-row select:focus, .guarantor-row input:focus { border-color:#3182ce; }
   .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
 
   /* 債權憑證年度調閱區塊 */
@@ -369,9 +380,28 @@
       <div class="form-group"><label class="form-label">案件編號</label><input class="form-control" id="f-id" placeholder="自動生成或手動輸入" /></div>
       <div class="form-group"><label class="form-label">登記日期</label><input class="form-control" type="date" id="f-date" /></div>
     </div>
+    <!-- 借款人類型 -->
+    <div class="form-group">
+      <label class="form-label">借款人類型</label>
+      <div class="type-toggle">
+        <input type="radio" name="f-btype" id="f-btype-person" value="自然人" checked onchange="onBorrowerTypeChange()">
+        <label for="f-btype-person">👤 自然人</label>
+        <input type="radio" name="f-btype" id="f-btype-company" value="法人" onchange="onBorrowerTypeChange()">
+        <label for="f-btype-company">🏢 法人（公司）</label>
+      </div>
+    </div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">借款人姓名</label><input class="form-control" id="f-name" /></div>
-      <div class="form-group"><label class="form-label">身分證字號</label><input class="form-control" id="f-idno" placeholder="A123456789" /></div>
+      <div class="form-group"><label class="form-label" id="f-name-label">借款人姓名</label><input class="form-control" id="f-name" placeholder="借款人全名或公司名稱" /></div>
+      <div class="form-group"><label class="form-label" id="f-idno-label">身分證字號</label><input class="form-control" id="f-idno" placeholder="A123456789（10碼）" maxlength="10" /></div>
+    </div>
+    <!-- 共同發票人/連保人 -->
+    <div class="form-group">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <label class="form-label" style="margin-bottom:0;">共同發票人 / 連保人</label>
+        <button type="button" class="btn btn-outline btn-sm" onclick="addGuarantorRow()">＋ 新增</button>
+      </div>
+      <div id="guarantor-list"></div>
+      <div id="guarantor-empty" style="font-size:12px;color:#a0aec0;text-align:center;padding:8px;">無共同發票人</div>
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">逾期金額（元）</label><input class="form-control" type="number" id="f-amount" placeholder="0" /></div>
@@ -636,7 +666,7 @@ function renderTable() {
   const curCourt = courtSel.value;
   courtSel.innerHTML = '<option value="">全部法院</option>'+courts.map(c=>`<option ${c===curCourt?'selected':''}>${c}</option>`).join('');
 
-  if (search) cases = cases.filter(c=>c.name.toLowerCase().includes(search)||c.id.toLowerCase().includes(search)||(c.idno||'').toLowerCase().includes(search));
+  if (search) cases = cases.filter(c=>c.name.toLowerCase().includes(search)||c.id.toLowerCase().includes(search)||(c.idno||'').toLowerCase().includes(search)||(c.guarantors||[]).some(g=>g.name.toLowerCase().includes(search)));
   if (stage)  cases = cases.filter(c=>c.stage===stage);
   if (court)  cases = cases.filter(c=>c.court===court);
   if (sort==='date-desc')   cases.sort((a,b)=>b.date.localeCompare(a.date));
@@ -657,7 +687,7 @@ function renderTable() {
     const rowBg = isCert ? 'background:#faf5ff;' : '';
     return `<tr style="border-bottom:1px solid #f0f4f8;${rowBg}">
       <td style="padding:10px 12px;font-size:12px;font-family:monospace;color:#4a5568;">${c.id}</td>
-      <td style="padding:10px 12px;font-weight:600;">${c.name}${isCert?` <span style="font-size:10px;color:#6b46c1;font-weight:600;">📅${certCount}次</span>`:''}</td>
+      <td style="padding:10px 12px;font-weight:600;">${c.name} <span class="badge badge-${c.borrowerType||'自然人'}" style="font-size:10px;">${c.borrowerType==='法人'?'法人':'自然人'}</span>${isCert?` <span style="font-size:10px;color:#6b46c1;font-weight:600;">📅${certCount}次</span>`:''}</td>
       <td style="padding:10px 12px;color:#c53030;font-weight:600;">${fmtM(c.amount)}</td>
       <td style="padding:10px 12px;"><span class="badge badge-${c.stage}">${c.stage}</span></td>
       <td style="padding:10px 12px;font-size:12px;color:#4a5568;">${c.lawyer||'—'}</td>
@@ -791,6 +821,66 @@ function closeModal(id) { document.getElementById(id).classList.remove('active')
 
 // 案件
 let editingId = null;
+function onBorrowerTypeChange() {
+  const isCompany = document.getElementById('f-btype-company').checked;
+  document.getElementById('f-name-label').textContent = isCompany ? '公司名稱' : '借款人姓名';
+  document.getElementById('f-idno-label').textContent = isCompany ? '統一編號' : '身分證字號';
+  document.getElementById('f-idno').placeholder = isCompany ? '12345678（8碼）' : 'A123456789（10碼）';
+  document.getElementById('f-idno').maxLength = isCompany ? 8 : 10;
+}
+
+let guarantorCount = 0;
+function addGuarantorRow(g={}) {
+  guarantorCount++;
+  const idx = guarantorCount;
+  const isCompany = g.type === '法人';
+  const row = document.createElement('div');
+  row.className = 'guarantor-row';
+  row.id = 'grow-'+idx;
+  row.innerHTML = `
+    <select onchange="onGuarantorTypeChange(${idx})" style="min-width:80px;">
+      <option value="自然人" ${!isCompany?'selected':''}>👤 自然人</option>
+      <option value="法人"   ${ isCompany?'selected':''}>🏢 法人</option>
+    </select>
+    <input placeholder="${isCompany?'公司名稱':'姓名'}" value="${g.name||''}" data-field="name" />
+    <input placeholder="${isCompany?'統一編號（8碼）':'身分證字號（10碼）'}" value="${g.idno||''}" data-field="idno" maxlength="${isCompany?8:10}" />
+    <button type="button" class="btn btn-danger btn-sm" onclick="removeGuarantorRow(${idx})">✕</button>`;
+  document.getElementById('guarantor-list').appendChild(row);
+  document.getElementById('guarantor-empty').style.display='none';
+}
+function onGuarantorTypeChange(idx) {
+  const row = document.getElementById('grow-'+idx);
+  const sel = row.querySelector('select');
+  const isCompany = sel.value === '法人';
+  const nameInput = row.querySelectorAll('input')[0];
+  const idnoInput = row.querySelectorAll('input')[1];
+  nameInput.placeholder = isCompany ? '公司名稱' : '姓名';
+  idnoInput.placeholder = isCompany ? '統一編號（8碼）' : '身分證字號（10碼）';
+  idnoInput.maxLength = isCompany ? 8 : 10;
+}
+function removeGuarantorRow(idx) {
+  const row = document.getElementById('grow-'+idx);
+  if (row) row.remove();
+  if (!document.getElementById('guarantor-list').children.length)
+    document.getElementById('guarantor-empty').style.display='block';
+}
+function getGuarantors() {
+  return [...document.getElementById('guarantor-list').children].map(row => ({
+    type: row.querySelector('select').value,
+    name: row.querySelectorAll('input')[0].value.trim(),
+    idno: row.querySelectorAll('input')[1].value.trim(),
+  })).filter(g => g.name);
+}
+function renderGuarantorForm(guarantors=[]) {
+  document.getElementById('guarantor-list').innerHTML='';
+  guarantorCount=0;
+  if (guarantors.length) {
+    guarantors.forEach(g => addGuarantorRow(g));
+  } else {
+    document.getElementById('guarantor-empty').style.display='block';
+  }
+}
+
 function openAddCase() {
   editingId=null;
   document.getElementById('modal-title-text').textContent='新增催收案件';
@@ -798,6 +888,9 @@ function openAddCase() {
   document.getElementById('f-date').value=today();
   ['f-name','f-idno','f-amount','f-days','f-court','f-lawyer','f-casenumber','f-gdlink','f-notes'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-stage').value='存證信函';
+  document.getElementById('f-btype-person').checked=true;
+  onBorrowerTypeChange();
+  renderGuarantorForm([]);
   openModal('case-modal');
 }
 function editCase(id) {
@@ -810,12 +903,20 @@ function editCase(id) {
   document.getElementById('f-stage').value=c.stage; document.getElementById('f-court').value=c.court||'';
   document.getElementById('f-lawyer').value=c.lawyer||''; document.getElementById('f-casenumber').value=c.casenumber||'';
   document.getElementById('f-gdlink').value=c.gdlink||''; document.getElementById('f-notes').value=c.notes||'';
+  // 借款人類型
+  const isCompany = c.borrowerType==='法人';
+  document.getElementById(isCompany?'f-btype-company':'f-btype-person').checked=true;
+  onBorrowerTypeChange();
+  // 共同發票人
+  renderGuarantorForm(c.guarantors||[]);
   openModal('case-modal');
 }
 function saveCase() {
+  const borrowerType = document.querySelector('input[name="f-btype"]:checked').value;
   const data={
     id:document.getElementById('f-id').value.trim(), date:document.getElementById('f-date').value,
     name:document.getElementById('f-name').value.trim(), idno:document.getElementById('f-idno').value.trim(),
+    borrowerType, guarantors:getGuarantors(),
     amount:Number(document.getElementById('f-amount').value)||0, days:Number(document.getElementById('f-days').value)||0,
     stage:document.getElementById('f-stage').value, court:document.getElementById('f-court').value.trim(),
     lawyer:document.getElementById('f-lawyer').value.trim(), casenumber:document.getElementById('f-casenumber').value.trim(),
@@ -878,12 +979,22 @@ function viewDetail(id) {
   document.getElementById('detail-content').innerHTML=`
     ${progressHtml}
     <div class="case-detail-grid">
-      <div class="detail-item"><div class="label">借款人</div><div class="value">${c.name}</div></div>
+      <div class="detail-item">
+        <div class="label">借款人</div>
+        <div class="value">${c.name} <span class="badge badge-${c.borrowerType||'自然人'}" style="margin-left:4px;">${c.borrowerType==='法人'?'🏢 法人':'👤 自然人'}</span></div>
+      </div>
+      <div class="detail-item"><div class="label">${c.borrowerType==='法人'?'統一編號':'身分證字號'}</div><div class="value" style="font-family:monospace;">${c.idno||'—'}</div></div>
       <div class="detail-item"><div class="label">逾期金額</div><div class="value" style="color:#c53030;">${fmtMoney(c.amount)}</div></div>
       <div class="detail-item"><div class="label">催收階段</div><div class="value"><span class="badge badge-${c.stage}">${c.stage}</span></div></div>
       <div class="detail-item"><div class="label">管轄法院</div><div class="value">${c.court||'—'}</div></div>
-      <div class="detail-item"><div class="label">委辦律師/機構</div><div class="value">${c.lawyer||'—'}</div></div>
       <div class="detail-item"><div class="label">案件字號</div><div class="value" style="font-size:12px;">${c.casenumber||'—'}</div></div>
+      <div class="detail-item"><div class="label">委辦律師/機構</div><div class="value">${c.lawyer||'—'}</div></div>
+      <div class="detail-item">
+        <div class="label">共同發票人 / 連保人</div>
+        <div class="value" style="font-size:13px;">
+          ${(c.guarantors&&c.guarantors.length)?c.guarantors.map(g=>`<div style="margin-bottom:3px;">${g.type==='法人'?'🏢':'👤'} ${g.name}${g.idno?' <span style=\'font-size:11px;color:#718096;font-family:monospace;\'>('+g.idno+')</span>':''}</div>`).join('') : '<span style="color:#a0aec0;">無</span>'}
+        </div>
+      </div>
     </div>
     <div class="offset-summary" style="margin-bottom:16px;">
       <div class="offset-box out"><div class="label">📤 代墊費用</div><div class="value">${fmtM(totalOut)}</div></div>
@@ -1008,11 +1119,12 @@ function exportExcel() {
   const cases=loadCases(), fees=loadFees(), reviews=loadReviews();
   const esc=v=>`"${String(v).replace(/"/g,'""')}"`;
 
-  const caseHeaders=['案件編號','登記日','借款人','身分證','逾期金額','逾期天數','催收階段','委辦律師/機構','管轄法院','案件字號','代墊費用合計','已收回合計','淨墊款','債權憑證調閱次數','GD連結','備註'];
+  const caseHeaders=['案件編號','登記日','借款人類型','借款人','身分證/統編','逾期金額','逾期天數','催收階段','委辦律師/機構','管轄法院','案件字號','共同發票人','代墊費用合計','已收回合計','淨墊款','債權憑證調閱次數','GD連結','備註'];
   const caseRows=cases.map(c=>{
     const {totalOut,totalIn,net}=caseFeesSummary(c.id);
     const certCnt=reviews.filter(r=>r.caseId===c.id).length;
-    return [c.id,c.date,c.name,c.idno||'',c.amount,c.days||0,c.stage,c.lawyer||'',c.court||'',c.casenumber||'',totalOut,totalIn,net,certCnt,c.gdlink||'',c.notes||''];
+    const gList=(c.guarantors||[]).map(g=>`${g.type} ${g.name}${g.idno?'('+g.idno+')':''}`).join('；');
+    return [c.id,c.date,c.borrowerType||'自然人',c.name,c.idno||'',c.amount,c.days||0,c.stage,c.lawyer||'',c.court||'',c.casenumber||'',gList,totalOut,totalIn,net,certCnt,c.gdlink||'',c.notes||''];
   });
 
   const feeHeaders=['類型','日期','案件編號','借款人','費用類別','說明','代墊金額','收款金額','付款方式','憑證'];
