@@ -308,17 +308,18 @@
             <option>查址費</option><option>徵信費</option><option>執行費</option>
             <option>委外催收費</option><option>其他費用</option>
           </optgroup>
-          <optgroup label="── 收款沖銷 ──">
-            <option value="__payment__">借款方收款（沖銷）</option>
+          <optgroup label="── 沖銷狀態 ──">
+            <option value="__no_offset__">未沖銷</option>
+            <option value="__partial__">部分沖銷</option>
+            <option value="__full__">已全額沖銷</option>
           </optgroup>
         </select>
         <div style="display:flex;gap:8px;margin-left:auto;">
-          <button class="btn btn-teal btn-sm" onclick="openAddPayment()">＋ 記錄收款沖銷</button>
           <button class="btn btn-primary btn-sm" onclick="openAddFee()">＋ 新增代墊費用</button>
         </div>
       </div>
       <table class="fee-table">
-        <thead><tr><th>日期</th><th>案件</th><th>借款人</th><th>類型</th><th>說明</th><th>代墊金額</th><th>收回金額</th><th>付款/收款方式</th><th>憑證</th><th>操作</th></tr></thead>
+        <thead><tr><th>日期</th><th>案件</th><th>借款人</th><th>類型</th><th>說明</th><th>代墊金額</th><th>已沖銷</th><th>餘額</th><th>狀態</th><th>付款方式</th><th>操作</th></tr></thead>
         <tbody id="fee-tbody"></tbody>
         <tfoot id="fee-tfoot"></tfoot>
       </table>
@@ -492,6 +493,40 @@
   </div>
 </div>
 
+<!-- 逐筆費用沖銷 Modal -->
+<div class="modal-overlay" id="fee-offset-modal">
+  <div class="modal" style="width:520px;">
+    <div class="modal-title"><span>💳 費用沖銷</span><button class="modal-close" onclick="closeModal('fee-offset-modal')">✕</button></div>
+    <!-- 費用資訊（唯讀）-->
+    <div id="fo-fee-info" style="background:#f7fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;margin-bottom:12px;font-size:13px;"></div>
+    <!-- 既有沖銷歷程 -->
+    <div id="fo-history-wrap" style="display:none;margin-bottom:12px;">
+      <div style="font-size:12px;font-weight:700;color:#4a5568;margin-bottom:6px;">沖銷歷程</div>
+      <div class="offset-history" id="fo-history"></div>
+    </div>
+    <!-- 新增沖銷 -->
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 14px;">
+      <div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:10px;">新增沖銷記錄</div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">沖銷日期</label><input class="form-control" type="date" id="fo-date" /></div>
+        <div class="form-group">
+          <label class="form-label">沖銷金額（元）</label>
+          <input class="form-control" type="number" id="fo-amount" placeholder="0" oninput="updateOffsetHint()" />
+        </div>
+      </div>
+      <div id="fo-quick-btns" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;"></div>
+      <div id="fo-hint" style="font-size:12px;color:#718096;margin-bottom:8px;"></div>
+      <div class="form-group" style="margin-bottom:0;"><label class="form-label">備註</label>
+        <input class="form-control" id="fo-notes" placeholder="例：借款方第一期還款、法院代收..." />
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px;">
+      <button class="btn btn-outline" onclick="closeModal('fee-offset-modal')">取消</button>
+      <button class="btn btn-success" onclick="saveFeeOffset()">儲存沖銷</button>
+    </div>
+  </div>
+</div>
+
 <!-- 收款沖銷 Modal -->
 <div class="modal-overlay" id="payment-modal">
   <div class="modal" style="width:500px;">
@@ -598,6 +633,7 @@ const CASES_KEY      = 'bznk_cases_v1';
 const FEES_KEY       = 'bznk_fees_v2';
 const REVIEWS_KEY    = 'bznk_reviews_v1';
 const RECOVERIES_KEY = 'bznk_recoveries_v1';
+const OFFSETS_KEY    = 'bznk_offsets_v1';
 
 function loadCases()   { try { return JSON.parse(localStorage.getItem(CASES_KEY)   || '[]'); } catch(e) { return []; } }
 function saveCases(d)  { localStorage.setItem(CASES_KEY,   JSON.stringify(d)); }
@@ -607,6 +643,8 @@ function loadReviews() { try { return JSON.parse(localStorage.getItem(REVIEWS_KE
 function saveReviews(d){ localStorage.setItem(REVIEWS_KEY, JSON.stringify(d)); }
 function loadRecoveries() { try { return JSON.parse(localStorage.getItem(RECOVERIES_KEY)||'[]'); } catch(e) { return []; } }
 function saveRecoveries(d){ localStorage.setItem(RECOVERIES_KEY, JSON.stringify(d)); }
+function loadOffsets()    { try { return JSON.parse(localStorage.getItem(OFFSETS_KEY)||'[]');    } catch(e) { return []; } }
+function saveOffsets(d)   { localStorage.setItem(OFFSETS_KEY,    JSON.stringify(d)); }
 
 function caseRecoverySummary(caseId) {
   const recs = loadRecoveries().filter(r=>r.caseId===caseId);
@@ -614,11 +652,25 @@ function caseRecoverySummary(caseId) {
   return { recovered, count: recs.length };
 }
 
+function feeOffsetSummary(feeId) {
+  const offs = loadOffsets().filter(o=>o.feeId===feeId);
+  const offsetted = offs.reduce((s,o)=>s+Number(o.amount||0),0);
+  return { offsetted, count: offs.length, offsets: offs };
+}
+
+function caseFeeNetSummary(caseId) {
+  // 代墊費用：只算非 isPayment
+  const fees = loadFees().filter(f=>f.caseId===caseId&&!f.isPayment);
+  const totalAdv = fees.reduce((s,f)=>s+Number(f.amount||0),0);
+  // 沖銷合計：新式逐筆 offsets
+  const allOffsets = loadOffsets().filter(o=>o.caseId===caseId);
+  const totalOff = allOffsets.reduce((s,o)=>s+Number(o.amount||0),0);
+  return { totalAdv, totalOff, net: totalAdv - totalOff };
+}
+
 function caseFeesSummary(caseId) {
-  const fees = loadFees().filter(f => f.caseId === caseId);
-  const totalOut = fees.filter(f => !f.isPayment).reduce((s,f) => s+Number(f.amount||0), 0);
-  const totalIn  = fees.filter(f =>  f.isPayment).reduce((s,f) => s+Number(f.amount||0), 0);
-  return { totalOut, totalIn, net: totalOut - totalIn };
+  const {totalAdv:totalOut, totalOff:totalIn, net} = caseFeeNetSummary(caseId);
+  return { totalOut, totalIn, net };
 }
 
 function genId() {
@@ -683,7 +735,7 @@ function renderStats() {
   const totalRecovered= recoveries.reduce((s,r)=>s+Number(r.amount||0),0);
   const remainPrincipal = Math.max(0, totalLoan - totalRecovered);
   const totalOut    = fees.filter(f=>!f.isPayment).reduce((s,f)=>s+Number(f.amount||0), 0);
-  const totalIn     = fees.filter(f=> f.isPayment).reduce((s,f)=>s+Number(f.amount||0), 0);
+  const totalIn     = loadOffsets().reduce((s,o)=>s+Number(o.amount||0), 0);
   const netFees     = totalOut - totalIn;
   const activeCases = cases.filter(c=>c.stage!=='結案').length;
   const certCases   = cases.filter(c=>c.stage==='債權憑證').length;
@@ -800,25 +852,59 @@ function renderFeeTable() {
   else if (typeFilter) fees = fees.filter(f=>f.type===typeFilter);
   fees.sort((a,b)=>b.date.localeCompare(a.date));
 
-  const sf = caseFilter ? loadFees().filter(f=>f.caseId===caseFilter) : loadFees();
-  const sumOut=sf.filter(f=>!f.isPayment).reduce((s,f)=>s+Number(f.amount||0),0);
-  const sumIn =sf.filter(f=> f.isPayment).reduce((s,f)=>s+Number(f.amount||0),0);
-  document.getElementById('offset-summary-box').innerHTML=`<div class="offset-summary"><div class="offset-box out"><div class="label">📤 代墊費用合計</div><div class="value">${fmtM(sumOut)}</div></div><div class="offset-box in"><div class="label">📥 借款方收回合計</div><div class="value">${fmtM(sumIn)}</div></div><div class="offset-box net"><div class="label">⚖️ 淨墊款餘額</div><div class="value">${fmtM(sumOut-sumIn)}</div></div></div>`;
+  // 摘要：使用新式逐筆沖銷計算
+  const baseFees = caseFilter ? loadFees().filter(f=>f.caseId===caseFilter&&!f.isPayment) : loadFees().filter(f=>!f.isPayment);
+  const sumOut = baseFees.reduce((s,f)=>s+Number(f.amount||0),0);
+  const allOffs = caseFilter ? loadOffsets().filter(o=>o.caseId===caseFilter) : loadOffsets();
+  const sumIn  = allOffs.reduce((s,o)=>s+Number(o.amount||0),0);
+  document.getElementById('offset-summary-box').innerHTML=`<div class="offset-summary"><div class="offset-box out"><div class="label">📤 代墊費用合計</div><div class="value">${fmtM(sumOut)}</div></div><div class="offset-box in"><div class="label">📥 已沖銷合計</div><div class="value">${fmtM(sumIn)}</div></div><div class="offset-box net"><div class="label">⚖️ 未沖銷餘額</div><div class="value">${fmtM(sumOut-sumIn)}</div></div></div>`;
+
+  // 篩選邏輯：依沖銷狀態
+  let displayFees = fees.filter(f=>!f.isPayment); // 只顯示費用行
+  if (typeFilter==='__no_offset__')  displayFees = displayFees.filter(f=>{ const {offsetted}=feeOffsetSummary(f.id); return offsetted===0; });
+  else if (typeFilter==='__partial__') displayFees = displayFees.filter(f=>{ const {offsetted}=feeOffsetSummary(f.id); return offsetted>0&&offsetted<Number(f.amount||0); });
+  else if (typeFilter==='__full__')    displayFees = displayFees.filter(f=>{ const {offsetted}=feeOffsetSummary(f.id); return offsetted>=Number(f.amount||0); });
+  else if (typeFilter)                 displayFees = displayFees.filter(f=>f.type===typeFilter);
 
   const tbody = document.getElementById('fee-tbody');
-  if (fees.length===0) { tbody.innerHTML=''; document.getElementById('fee-tfoot').innerHTML=''; document.getElementById('fee-empty').style.display='block'; return; }
+  if (displayFees.length===0) { tbody.innerHTML=''; document.getElementById('fee-tfoot').innerHTML=''; document.getElementById('fee-empty').style.display='block'; return; }
   document.getElementById('fee-empty').style.display='none';
 
-  tbody.innerHTML = fees.map(f => {
+  tbody.innerHTML = displayFees.map(f => {
     const c = cases.find(c=>c.id===f.caseId);
-    return f.isPayment
-      ? `<tr class="row-payment"><td>${f.date}</td><td style="font-size:12px;font-family:monospace;">${f.caseId}</td><td style="font-weight:500;">${c?c.name:'—'}</td><td><span class="tag-payment">📥 收款沖銷</span></td><td style="color:#276749;">${f.desc}</td><td style="color:#a0aec0;">—</td><td class="amount-in">+ ${fmtM(f.amount)}</td><td style="font-size:12px;color:#718096;">${f.pay}</td><td style="font-size:12px;color:#a0aec0;">${f.receipt||'—'}</td><td style="white-space:nowrap;"><button class="btn btn-outline btn-sm" onclick="editFeeRecord('${f.id}')">編輯</button> <button class="btn btn-danger btn-sm" onclick="deleteFee('${f.id}')">刪除</button></td></tr>`
-      : `<tr class="row-fee"><td>${f.date}</td><td style="font-size:12px;font-family:monospace;">${f.caseId}</td><td style="font-weight:500;">${c?c.name:'—'}</td><td><span class="tag-fee">📤 ${f.type}</span></td><td style="color:#4a5568;">${f.desc}</td><td class="amount-out">- ${fmtM(f.amount)}</td><td style="color:#a0aec0;">—</td><td style="font-size:12px;color:#718096;">${f.pay}</td><td style="font-size:12px;color:#a0aec0;">${f.receipt||'—'}</td><td style="white-space:nowrap;"><button class="btn btn-outline btn-sm" onclick="editFeeRecord('${f.id}')">編輯</button> <button class="btn btn-danger btn-sm" onclick="deleteFee('${f.id}')">刪除</button></td></tr>`;
+    const {offsetted, count:offCount} = feeOffsetSummary(f.id);
+    const orig = Number(f.amount||0);
+    const remaining = Math.max(0, orig - offsetted);
+    const isFullyOffset = offsetted >= orig;
+    const isPartial = offsetted > 0 && !isFullyOffset;
+    const statusTag = isFullyOffset
+      ? `<span class="tag-offset-full">✓ 已沖銷</span>`
+      : isPartial
+        ? `<span class="tag-offset-partial">部分 ${fmtM(offsetted)}</span>`
+        : `<span class="tag-offset-none">未沖銷</span>`;
+    const rowStyle = isFullyOffset ? 'background:#f0fff4;' : isPartial ? 'background:#fffbeb;' : '';
+    return `<tr style="border-bottom:1px solid #f0f4f8;${rowStyle}">
+      <td style="padding:9px 12px;font-size:12px;">${f.date}</td>
+      <td style="padding:9px 12px;font-size:12px;font-family:monospace;">${f.caseId}</td>
+      <td style="padding:9px 12px;font-weight:500;">${c?c.name:'—'}</td>
+      <td style="padding:9px 12px;"><span class="tag-fee">📤 ${f.type}</span></td>
+      <td style="padding:9px 12px;color:#4a5568;font-size:12px;">${f.desc}</td>
+      <td style="padding:9px 12px;" class="amount-out">${fmtM(orig)}</td>
+      <td style="padding:9px 12px;font-size:12px;color:#276749;font-weight:${offsetted>0?'600':'400'};">${offsetted>0?fmtM(offsetted):'—'}</td>
+      <td style="padding:9px 12px;font-weight:600;color:${remaining>0?'#dd6b20':'#276749'};">${remaining>0?fmtM(remaining):'$0'}</td>
+      <td style="padding:9px 12px;">${statusTag}</td>
+      <td style="padding:9px 12px;font-size:12px;color:#718096;">${f.pay}</td>
+      <td style="padding:9px 12px;white-space:nowrap;">
+        ${!isFullyOffset?`<button class="btn btn-success btn-sm" onclick="openFeeOffset('${f.id}')">沖銷</button> `:''}
+        <button class="btn btn-outline btn-sm" onclick="editFeeRecord('${f.id}')">編輯</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteFee('${f.id}')">刪除</button>
+      </td>
+    </tr>`;
   }).join('');
 
-  const tOut=fees.filter(f=>!f.isPayment).reduce((s,f)=>s+Number(f.amount||0),0);
-  const tIn =fees.filter(f=> f.isPayment).reduce((s,f)=>s+Number(f.amount||0),0);
-  document.getElementById('fee-tfoot').innerHTML=`<tr class="total-row"><td colspan="5" style="padding:10px 12px;text-align:right;font-size:12px;">合計（篩選結果）</td><td style="padding:10px 12px;" class="amount-out">${fmtM(tOut)}</td><td style="padding:10px 12px;" class="amount-in">+ ${fmtM(tIn)}</td><td colspan="3" style="padding:10px 12px;font-size:12px;color:#dd6b20;font-weight:700;">淨墊款 ${fmtM(tOut-tIn)}</td></tr>`;
+  const tAdv = displayFees.reduce((s,f)=>s+Number(f.amount||0),0);
+  const tOff = displayFees.reduce((s,f)=>s+feeOffsetSummary(f.id).offsetted,0);
+  document.getElementById('fee-tfoot').innerHTML=`<tr class="total-row"><td colspan="5" style="padding:10px 12px;text-align:right;font-size:12px;">合計（篩選結果）</td><td style="padding:10px 12px;" class="amount-out">${fmtM(tAdv)}</td><td style="padding:10px 12px;color:#276749;font-weight:700;">${fmtM(tOff)}</td><td style="padding:10px 12px;color:#dd6b20;font-weight:700;">${fmtM(tAdv-tOff)}</td><td colspan="3" style="padding:10px 12px;"></td></tr>`;
 }
 
 // ── 年度調閱 Tab ──────────────────────────────────
@@ -1036,10 +1122,12 @@ function saveCase() {
 }
 function deleteCase(id) {
   if(!confirm(`確定要刪除案件 ${id}？\n相關費用、收款記錄、年度調閱記錄也會一併刪除。`)) return;
+  const cFees = loadFees().filter(f=>f.caseId===id).map(f=>f.id);
   saveCases(loadCases().filter(c=>c.id!==id));
   saveFees(loadFees().filter(f=>f.caseId!==id));
   saveReviews(loadReviews().filter(r=>r.caseId!==id));
   saveRecoveries(loadRecoveries().filter(r=>r.caseId!==id));
+  saveOffsets(loadOffsets().filter(o=>o.caseId!==id));
   refresh();
 }
 
@@ -1253,8 +1341,114 @@ function editFeeRecord(id) {
 
 function deleteFee(id) {
   const f=loadFees().find(x=>x.id===id);
-  if(!confirm(`確定刪除此${f&&f.isPayment?'收款':'費用'}記錄？`)) return;
-  saveFees(loadFees().filter(x=>x.id!==id)); refresh();
+  const offCount = feeOffsetSummary(id).count;
+  const msg = `確定刪除此費用記錄？` + (offCount>0 ? `
+（此費用已有 ${offCount} 筆沖銷記錄，一併刪除）` : '');
+  if(!confirm(msg)) return;
+  saveFees(loadFees().filter(x=>x.id!==id));
+  saveOffsets(loadOffsets().filter(o=>o.feeId!==id));
+  refresh();
+}
+
+// ── 逐筆沖銷 ──────────────────────────────────────
+let currentOffsetFeeId = null;
+
+function openFeeOffset(feeId) {
+  currentOffsetFeeId = feeId;
+  const f = loadFees().find(x=>x.id===feeId);
+  if (!f) return;
+  const c = loadCases().find(x=>x.id===f.caseId);
+  const {offsetted, offsets} = feeOffsetSummary(feeId);
+  const orig = Number(f.amount||0);
+  const remaining = Math.max(0, orig - offsetted);
+
+  // 費用資訊
+  document.getElementById('fo-fee-info').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div><span style="font-size:11px;color:#718096;text-transform:uppercase;font-weight:600;">案件</span><br><span style="font-weight:600;">${c?c.name:'—'}</span></div>
+      <div><span style="font-size:11px;color:#718096;text-transform:uppercase;font-weight:600;">費用類型</span><br><span class="tag-fee">📤 ${f.type}</span></div>
+      <div><span style="font-size:11px;color:#718096;text-transform:uppercase;font-weight:600;">說明</span><br><span style="font-size:12px;">${f.desc||'—'}</span></div>
+      <div><span style="font-size:11px;color:#718096;text-transform:uppercase;font-weight:600;">代墊金額</span><br><span style="color:#c53030;font-weight:700;">${fmtM(orig)}</span></div>
+      <div><span style="font-size:11px;color:#718096;text-transform:uppercase;font-weight:600;">已沖銷</span><br><span style="color:#276749;font-weight:600;">${fmtM(offsetted)}</span></div>
+      <div><span style="font-size:11px;color:#718096;text-transform:uppercase;font-weight:600;">剩餘未沖銷</span><br><span style="color:#dd6b20;font-weight:700;">${fmtM(remaining)}</span></div>
+    </div>`;
+
+  // 沖銷歷程
+  const histWrap = document.getElementById('fo-history-wrap');
+  if (offsets.length > 0) {
+    histWrap.style.display='block';
+    document.getElementById('fo-history').innerHTML = offsets.sort((a,b)=>b.date.localeCompare(a.date)).map(o=>`
+      <div class="offset-history-row">
+        <span style="color:#718096;">${o.date}</span>
+        <span style="font-weight:600;color:#276749;">${fmtM(o.amount)}</span>
+        <span style="color:#4a5568;font-size:11px;">${o.notes||'—'}</span>
+        <button class="btn btn-danger btn-sm" style="padding:2px 7px;font-size:11px;" onclick="deleteOffset('${o.id}')">✕</button>
+      </div>`).join('');
+  } else {
+    histWrap.style.display='none';
+  }
+
+  // 快速按鈕：全額 / 常用金額
+  const quickBtns = document.getElementById('fo-quick-btns');
+  quickBtns.innerHTML = remaining > 0 ? `
+    <button class="btn btn-outline btn-sm" onclick="setOffsetAmount(${remaining})">全額 ${fmtM(remaining)}</button>
+    ${remaining >= 10000 ? `<button class="btn btn-outline btn-sm" onclick="setOffsetAmount(${Math.round(remaining/2)})">半額 ${fmtM(Math.round(remaining/2))}</button>` : ''}
+  ` : '';
+
+  // 預設值
+  document.getElementById('fo-date').value = today();
+  document.getElementById('fo-amount').value = remaining > 0 ? remaining : '';
+  document.getElementById('fo-notes').value = '';
+  updateOffsetHint();
+  openModal('fee-offset-modal');
+}
+
+function setOffsetAmount(amt) {
+  document.getElementById('fo-amount').value = amt;
+  updateOffsetHint();
+}
+
+function updateOffsetHint() {
+  if (!currentOffsetFeeId) return;
+  const f = loadFees().find(x=>x.id===currentOffsetFeeId);
+  if (!f) return;
+  const {offsetted} = feeOffsetSummary(currentOffsetFeeId);
+  const orig = Number(f.amount||0);
+  const remaining = Math.max(0, orig - offsetted);
+  const inputAmt = Number(document.getElementById('fo-amount').value)||0;
+  let hint = `剩餘未沖銷：${fmtM(remaining)}`;
+  if (inputAmt > 0) {
+    if (inputAmt >= remaining) hint += `　→　全額沖銷完畢 ✓`;
+    else hint += `　→　沖銷後餘 ${fmtM(remaining - inputAmt)}`;
+  }
+  if (inputAmt > remaining) hint += `　⚠️ 超過剩餘金額`;
+  document.getElementById('fo-hint').textContent = hint;
+}
+
+function saveFeeOffset() {
+  const feeId = currentOffsetFeeId;
+  const amount = Number(document.getElementById('fo-amount').value)||0;
+  if (!feeId) return;
+  if (!amount) { alert('請輸入沖銷金額'); return; }
+  const f = loadFees().find(x=>x.id===feeId);
+  if (!f) return;
+  const {offsetted} = feeOffsetSummary(feeId);
+  const remaining = Math.max(0, Number(f.amount||0) - offsetted);
+  if (amount > remaining + 0.01) { if (!confirm(`沖銷金額 ${fmtM(amount)} 超過剩餘 ${fmtM(remaining)}，確定繼續？`)) return; }
+  const offsets = loadOffsets();
+  offsets.push({ id:'O'+Date.now(), feeId, caseId:f.caseId, date:document.getElementById('fo-date').value, amount, notes:document.getElementById('fo-notes').value.trim() });
+  saveOffsets(offsets);
+  closeModal('fee-offset-modal');
+  currentOffsetFeeId = null;
+  refresh();
+}
+
+function deleteOffset(id) {
+  if (!confirm('確定刪除此沖銷記錄？')) return;
+  saveOffsets(loadOffsets().filter(o=>o.id!==id));
+  // 若 modal 仍開著，重新整理 modal 顯示
+  if (currentOffsetFeeId) openFeeOffset(currentOffsetFeeId);
+  refresh();
 }
 
 // ── 年度調閱 ──────────────────────────────────────
@@ -1478,6 +1672,12 @@ function exportExcel() {
     });
   });
 
+  const offHeaders=['案件編號','借款人','費用ID','費用類型','費用說明','費用金額','沖銷日期','沖銷金額','備註'];
+  const offRows=loadOffsets().map(o=>{
+    const f=loadFees().find(f=>f.id===o.feeId);
+    const c=cases.find(c=>c.id===o.caseId);
+    return [o.caseId,c?c.name:'',o.feeId,f?f.type:'',f?f.desc:'',f?f.amount:'',o.date,o.amount,o.notes||''];
+  });
   const recHeaders=['案件編號','借款人','催回日期','催回金額','備註'];
   const recRows=loadRecoveries().map(r=>{
     const c=cases.find(c=>c.id===r.caseId);
@@ -1489,6 +1689,8 @@ function exportExcel() {
   caseRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
   csv+='\n=== 費用與收款明細 ===\n'+feeHeaders.map(esc).join(',')+'\n';
   feeRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
+  csv+='\n=== 費用沖銷明細 ===\n'+offHeaders.map(esc).join(',')+'\n';
+  offRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
   csv+='\n=== 本金催回明細 ===\n'+recHeaders.map(esc).join(',')+'\n';
   recRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
   csv+='\n=== 債權憑證年度調閱記錄 ===\n'+revHeaders.map(esc).join(',')+'\n';
