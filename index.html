@@ -1643,59 +1643,7 @@ function deleteRecovery(id) {
 
 // ── 匯出 CSV ─────────────────────────────────────
 function exportExcel() {
-  const cases=loadCases(), fees=loadFees(), reviews=loadReviews();
-  const esc=v=>`"${String(v).replace(/"/g,'""')}"`;
-
-  const caseHeaders=['案件編號','登記日','借款人類型','借款人','身分證/統編','逾期本金','利息','逾期天數','已催回本金','剩餘本金','催收階段','委辦律師/機構','管轄法院','案件字號','共同發票人','代墊費用合計','已收回費用','淨墊款','債權憑證調閱次數','GD連結','備註'];
-  const caseRows=cases.map(c=>{
-    const {totalOut,totalIn,net}=caseFeesSummary(c.id);
-    const certCnt=reviews.filter(r=>r.caseId===c.id).length;
-    const gList=(c.guarantors||[]).map(g=>`${g.type} ${g.name}${g.idno?'('+g.idno+')':''}`).join('；');
-    const {recovered:cRecovered}=caseRecoverySummary(c.id);
-    const cRemain=Math.max(0,Number(c.amount||0)-cRecovered);
-    return [c.id,c.date,c.borrowerType||'自然人',c.name,c.idno||'',c.amount,c.interest||0,calcDays(c.date),cRecovered,cRemain,c.stage,c.lawyer||'',c.court||'',c.casenumber||'',gList,totalOut,totalIn,net,certCnt,c.gdlink||'',c.notes||''];
-  });
-
-  const feeHeaders=['類型','日期','案件編號','借款人','費用類別','說明','代墊金額','收款金額','付款方式','憑證'];
-  const feeRows=fees.map(f=>{
-    const c=cases.find(c=>c.id===f.caseId);
-    return [f.isPayment?'收款沖銷':'代墊費用',f.date,f.caseId,c?c.name:'',f.type,f.desc,f.isPayment?'':f.amount,f.isPayment?f.amount:'',f.pay,f.receipt||''];
-  });
-
-  const revHeaders=['案件編號','借款人','年度','綜所稅申報完成日','角色','姓名/公司','證號','調閱日期','財產清冊結果','所得清冊結果','有無可執行資產','整體處置','再執行費用','備註'];
-  const revRows=[];
-  reviews.forEach(r=>{
-    const c=cases.find(c=>c.id===r.caseId);
-    const persons=r.persons&&r.persons.length?r.persons:[{role:'—',name:c?c.name:'',idno:'',reviewdate:r.reviewdate||'',property:r.property||'',income:r.income||'',asset:r.asset||'—'}];
-    persons.forEach(p=>{
-      revRows.push([r.caseId,c?c.name:'',r.year,r.taxdate||'',p.role,p.name,p.idno||'',p.reviewdate||'',p.property||'',p.income||'',p.asset,r.action,r.execfee||0,r.notes||'']);
-    });
-  });
-
-  const offHeaders=['案件編號','借款人','費用ID','費用類型','費用說明','費用金額','沖銷日期','沖銷金額','備註'];
-  const offRows=loadOffsets().map(o=>{
-    const f=loadFees().find(f=>f.id===o.feeId);
-    const c=cases.find(c=>c.id===o.caseId);
-    return [o.caseId,c?c.name:'',o.feeId,f?f.type:'',f?f.desc:'',f?f.amount:'',o.date,o.amount,o.notes||''];
-  });
-  const recHeaders=['案件編號','借款人','催回日期','催回金額','備註'];
-  const recRows=loadRecoveries().map(r=>{
-    const c=cases.find(c=>c.id===r.caseId);
-    return [r.caseId,c?c.name:'',r.date,r.amount,r.notes||''];
-  });
-
-  let csv='﻿';
-  csv+='=== 案件清單 ===\n'+caseHeaders.map(esc).join(',')+'\n';
-  caseRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
-  csv+='\n=== 費用與收款明細 ===\n'+feeHeaders.map(esc).join(',')+'\n';
-  feeRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
-  csv+='\n=== 費用沖銷明細 ===\n'+offHeaders.map(esc).join(',')+'\n';
-  offRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
-  csv+='\n=== 本金催回明細 ===\n'+recHeaders.map(esc).join(',')+'\n';
-  recRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
-  csv+='\n=== 債權憑證年度調閱記錄 ===\n'+revHeaders.map(esc).join(',')+'\n';
-  revRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
-
+  const csv = buildCsvContent();
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
   a.download=`催收案件_${today()}.csv`; a.click();
@@ -1706,6 +1654,9 @@ function refresh() {
   renderStats(); renderCharts(); renderTable();
   if(document.getElementById('tab-fees').classList.contains('active')) renderFeeTable();
   if(document.getElementById('tab-reviews').classList.contains('active')) renderReviewsTab();
+  // 資料有變更時觸發 GD 自動匯出（debounce 3秒）
+  clearTimeout(window._exportTimer);
+  window._exportTimer = setTimeout(autoExportToDrive, 3000);
 }
 
 document.querySelectorAll('.modal-overlay').forEach(el=>{
@@ -1854,7 +1805,130 @@ const auth=firebase.auth();
 const provider=new firebase.auth.GoogleAuthProvider();
 provider.setCustomParameters({hd:ALLOWED_DOMAIN});
 provider.addScope('https://www.googleapis.com/auth/drive.readonly');
+provider.addScope('https://www.googleapis.com/auth/drive.file');
 window._driveToken=null; // 儲存 Drive access token
+
+// ── 自動匯出到 GD ─────────────────────────────────
+const AUTO_EXPORT_FOLDER='1biFWELku069XYVxgqfbu6gZpY--vRWSZ';
+const EXPORT_HASH_KEY='bznk_export_hash_v1';
+
+function calcDataHash() {
+  // 把所有 localStorage 資料串在一起算 hash（簡單 checksum）
+  const raw = [
+    localStorage.getItem('bznk_cases_v1')||'',
+    localStorage.getItem('bznk_fees_v2')||'',
+    localStorage.getItem('bznk_reviews_v1')||'',
+    localStorage.getItem('bznk_recoveries_v1')||'',
+    localStorage.getItem('bznk_offsets_v1')||''
+  ].join('|');
+  let h=0;
+  for(let i=0;i<raw.length;i++){h=Math.imul(31,h)+raw.charCodeAt(i)|0;}
+  return String(h>>>0);
+}
+
+function buildCsvContent() {
+  const cases=loadCases(), fees=loadFees(), reviews=loadReviews();
+  const esc=v=>`"${String(v).replace(/"/g,'""')}"`;
+
+  const caseHeaders=['案件編號','登記日','借款人類型','借款人','身分證/統編','逾期本金','利息','逾期天數','已催回本金','剩餘本金','催收階段','委辦律師/機構','管轄法院','案件字號','共同發票人','代墊費用合計','已收回費用','淨墊款','債權憑證調閱次數','GD連結','備註'];
+  const caseRows=cases.map(c=>{
+    const {totalOut,totalIn,net}=caseFeesSummary(c.id);
+    const certCnt=reviews.filter(r=>r.caseId===c.id).length;
+    const gList=(c.guarantors||[]).map(g=>`${g.type} ${g.name}${g.idno?'('+g.idno+')':''}`).join('；');
+    const {recovered:cRecovered}=caseRecoverySummary(c.id);
+    const cRemain=Math.max(0,Number(c.amount||0)-cRecovered);
+    return [c.id,c.date,c.borrowerType||'自然人',c.name,c.idno||'',c.amount,c.interest||0,calcDays(c.date),cRecovered,cRemain,c.stage,c.lawyer||'',c.court||'',c.casenumber||'',gList,totalOut,totalIn,net,certCnt,c.gdlink||'',c.notes||''];
+  });
+  const feeHeaders=['類型','日期','案件編號','借款人','費用類別','說明','代墊金額','收款金額','付款方式','憑證'];
+  const feeRows=fees.map(f=>{
+    const c=cases.find(c=>c.id===f.caseId);
+    return [f.isPayment?'收款沖銷':'代墊費用',f.date,f.caseId,c?c.name:'',f.type,f.desc,f.isPayment?'':f.amount,f.isPayment?f.amount:'',f.pay,f.receipt||''];
+  });
+  const revHeaders=['案件編號','借款人','年度','綜所稅申報完成日','角色','姓名/公司','證號','調閱日期','財產清冊結果','所得清冊結果','有無可執行資產','整體處置','再執行費用','備註'];
+  const revRows=[];
+  reviews.forEach(r=>{
+    const c=cases.find(c=>c.id===r.caseId);
+    const persons=r.persons&&r.persons.length?r.persons:[{role:'—',name:c?c.name:'',idno:'',reviewdate:r.reviewdate||'',property:r.property||'',income:r.income||''}];
+    persons.forEach(p=>{
+      revRows.push([r.caseId,c?c.name:'',r.year,r.taxdate||'',p.role,p.name,p.idno||'',p.reviewdate||'',p.property||'',p.income||'',p.asset||'',r.action,r.execfee||0,r.notes||'']);
+    });
+  });
+  const offHeaders=['案件編號','借款人','費用ID','費用類型','費用說明','費用金額','沖銷日期','沖銷金額','備註'];
+  const offRows=loadOffsets().map(o=>{
+    const f=fees.find(f=>f.id===o.feeId);
+    const c=cases.find(c=>c.id===o.caseId);
+    return [o.caseId,c?c.name:'',o.feeId,f?f.type:'',f?f.desc:'',f?f.amount:'',o.date,o.amount,o.notes||''];
+  });
+  const recHeaders=['案件編號','借款人','催回日期','催回金額','備註'];
+  const recRows=loadRecoveries().map(r=>{
+    const c=cases.find(c=>c.id===r.caseId);
+    return [r.caseId,c?c.name:'',r.date,r.amount,r.notes||''];
+  });
+
+  let csv='﻿';
+  csv+='=== 案件清單 ===\n'+caseHeaders.map(esc).join(',')+'\n';
+  caseRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
+  csv+='\n=== 費用與收款明細 ===\n'+feeHeaders.map(esc).join(',')+'\n';
+  feeRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
+  csv+='\n=== 費用沖銷明細 ===\n'+offHeaders.map(esc).join(',')+'\n';
+  offRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
+  csv+='\n=== 本金催回明細 ===\n'+recHeaders.map(esc).join(',')+'\n';
+  recRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
+  csv+='\n=== 債權憑證年度調閱記錄 ===\n'+revHeaders.map(esc).join(',')+'\n';
+  revRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
+  return csv;
+}
+
+async function autoExportToDrive() {
+  if (!window._driveToken) return;
+
+  const currentHash = calcDataHash();
+  const lastHash = localStorage.getItem(EXPORT_HASH_KEY)||'';
+  if (currentHash === lastHash) return; // 資料沒變，不匯出
+
+  try {
+    const csv = buildCsvContent();
+    const filename = `催收案件報表_${today()}.csv`;
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+
+    // 先查詢是否已有同名舊檔案（搜尋前綴「催收案件報表_」）
+    const searchQ = encodeURIComponent(`'${AUTO_EXPORT_FOLDER}' in parents and name contains '催收案件報表_' and trashed=false`);
+    const searchRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${searchQ}&fields=files(id,name)`,
+      {headers:{Authorization:'Bearer '+window._driveToken}}
+    );
+    if (!searchRes.ok) throw new Error('search '+searchRes.status);
+    const searchData = await searchRes.json();
+    // 刪除舊的同類報表（只刪本系統產生的）
+    for (const f of (searchData.files||[])) {
+      await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {
+        method:'DELETE', headers:{Authorization:'Bearer '+window._driveToken}
+      });
+    }
+
+    // 上傳新檔案（multipart）
+    const meta = JSON.stringify({name: filename, parents:[AUTO_EXPORT_FOLDER]});
+    const boundary = '-------bznk_boundary';
+    const body = [
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n`,
+      `--${boundary}\r\nContent-Type: text/csv; charset=UTF-8\r\n\r\n`,
+      csv,
+      `\r\n--${boundary}--`
+    ].join('');
+    const uploadRes = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+      {method:'POST', headers:{Authorization:'Bearer '+window._driveToken, 'Content-Type':`multipart/related; boundary=${boundary}`}, body}
+    );
+    if (!uploadRes.ok) throw new Error('upload '+uploadRes.status);
+
+    // 更新 hash，代表此版資料已成功上傳
+    localStorage.setItem(EXPORT_HASH_KEY, currentHash);
+    console.log('[AutoExport] 已上傳報表到 GD：'+filename);
+  } catch(e) {
+    console.warn('[AutoExport] 匯出失敗：', e.message);
+    // 靜默失敗，不影響系統使用
+  }
+}
 
 function signIn() {
   document.getElementById('login-err').style.display='none';
@@ -1886,6 +1960,8 @@ auth.onAuthStateChanged(user=>{
     document.getElementById('user-photo').src=user.photoURL||'';
     document.getElementById('user-photo').style.display=user.photoURL?'block':'none';
     seedData(); refresh();
+    // 登入後靜默檢查是否需要同步報表到 GD
+    setTimeout(autoExportToDrive, 2000);
   } else {
     wall.classList.remove('hidden'); chip.style.display='none';
     document.getElementById('login-loading').style.display='none';
