@@ -1881,17 +1881,29 @@ function buildCsvContent() {
 
 async function autoExportToDrive() {
   if (!window._driveToken) return;
+  if (window._exportInProgress) return; // 避免同時跑兩次
 
   const currentHash = calcDataHash();
-  const lastHash = localStorage.getItem(EXPORT_HASH_KEY)||'';
-  if (currentHash === lastHash) return; // 資料沒變，不匯出
+  const currentDate = today();
+  // 讀取上次匯出記錄 {hash, date}
+  let lastExport = {};
+  try { lastExport = JSON.parse(localStorage.getItem(EXPORT_HASH_KEY)||'{}'); } catch(e){}
 
+  // 今天已匯出過 → 跳過
+  if (lastExport.date === currentDate) return;
+
+  // 資料跟上次匯出時完全一樣 → 只更新日期，不重新上傳
+  if (currentHash === lastExport.hash) {
+    localStorage.setItem(EXPORT_HASH_KEY, JSON.stringify({hash:currentHash, date:currentDate}));
+    return;
+  }
+
+  window._exportInProgress = true;
   try {
     const csv = buildCsvContent();
-    const filename = `催收案件報表_${today()}.csv`;
-    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const filename = `催收案件報表_${currentDate}.csv`;
 
-    // 先查詢是否已有同名舊檔案（搜尋前綴「催收案件報表_」）
+    // 先查詢並刪除舊報表
     const searchQ = encodeURIComponent(`'${AUTO_EXPORT_FOLDER}' in parents and name contains '催收案件報表_' and trashed=false`);
     const searchRes = await fetch(
       `https://www.googleapis.com/drive/v3/files?q=${searchQ}&fields=files(id,name)`,
@@ -1899,7 +1911,6 @@ async function autoExportToDrive() {
     );
     if (!searchRes.ok) throw new Error('search '+searchRes.status);
     const searchData = await searchRes.json();
-    // 刪除舊的同類報表（只刪本系統產生的）
     for (const f of (searchData.files||[])) {
       await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {
         method:'DELETE', headers:{Authorization:'Bearer '+window._driveToken}
@@ -1921,12 +1932,13 @@ async function autoExportToDrive() {
     );
     if (!uploadRes.ok) throw new Error('upload '+uploadRes.status);
 
-    // 更新 hash，代表此版資料已成功上傳
-    localStorage.setItem(EXPORT_HASH_KEY, currentHash);
+    // 儲存 hash + 日期
+    localStorage.setItem(EXPORT_HASH_KEY, JSON.stringify({hash:currentHash, date:currentDate}));
     console.log('[AutoExport] 已上傳報表到 GD：'+filename);
   } catch(e) {
     console.warn('[AutoExport] 匯出失敗：', e.message);
-    // 靜默失敗，不影響系統使用
+  } finally {
+    window._exportInProgress = false;
   }
 }
 
