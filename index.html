@@ -160,9 +160,14 @@
   .type-toggle input[type=radio]:checked + label { background:#3182ce; color:white; }
   .badge-自然人 { background:#e6fffa; color:#234e52; }
   .badge-法人   { background:#ebf4ff; color:#2a4365; }
-  .guarantor-row { display:grid; grid-template-columns:auto 1fr 1fr auto; gap:8px; align-items:center; background:#f7fafc; border:1px solid #e2e8f0; border-radius:6px; padding:8px 10px; margin-bottom:6px; }
-  .guarantor-row select, .guarantor-row input { padding:5px 8px; border:1px solid #e2e8f0; border-radius:5px; font-size:12px; color:#2d3748; outline:none; }
+  .guarantor-row { background:#f7fafc; border:1px solid #e2e8f0; border-radius:6px; padding:8px 10px; margin-bottom:6px; }
+  .guarantor-row .grow-main { display:grid; grid-template-columns:auto 1fr 1fr auto; gap:8px; align-items:center; }
+  .guarantor-row .grow-extra { display:grid; grid-template-columns:1fr 2fr 1fr; gap:6px; margin-top:6px; }
+  .guarantor-row select, .guarantor-row input { padding:5px 8px; border:1px solid #e2e8f0; border-radius:5px; font-size:12px; color:#2d3748; outline:none; width:100%; }
   .guarantor-row select:focus, .guarantor-row input:focus { border-color:#3182ce; }
+  .court-section { background:#f0fff4; border:1px solid #c6f6d5; border-radius:8px; padding:12px 14px; margin-bottom:14px; }
+  .court-section-toggle { cursor:pointer; font-size:12px; font-weight:600; color:#276749; display:flex; align-items:center; justify-content:space-between; user-select:none; }
+  .court-section-body { margin-top:10px; }
   .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
 
   /* 債權憑證年度調閱區塊 */
@@ -229,6 +234,7 @@
     <div class="subtitle">網路借貸媒合平臺 · 法律催收控管</div>
   </div>
   <div class="header-actions">
+    <button class="btn btn-outline" onclick="openSettings()" style="background:rgba(255,255,255,0.15);color:white;border-color:rgba(255,255,255,0.3);">⚙ 系統設定</button>
     <button class="btn btn-outline" onclick="exportExcel()" style="background:rgba(255,255,255,0.15);color:white;border-color:rgba(255,255,255,0.3);">⬇ 匯出 Excel</button>
     <button class="btn btn-success" onclick="openAddCase()">＋ 新增案件</button>
     <div class="user-chip" id="user-chip" style="display:none;">
@@ -452,12 +458,91 @@
       <div class="form-group"><label class="form-label">委辦律師/機構</label><input class="form-control" id="f-lawyer" /></div>
       <div class="form-group"><label class="form-label">案件字號</label><input class="form-control" id="f-casenumber" placeholder="例：114年度執字第12345號" /></div>
     </div>
+    <!-- 法院公文資料（折疊） -->
+    <div class="court-section">
+      <div class="court-section-toggle" onclick="toggleCourtSection()">
+        <span>📋 法院公文資料（選填）</span>
+        <span id="court-section-arrow">▸ 展開</span>
+      </div>
+      <div class="court-section-body" id="court-section-body" style="display:none;">
+        <!-- 借款人個人資料 -->
+        <div style="font-size:11px;font-weight:700;color:#276749;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;margin-top:2px;">借款人聯絡資料</div>
+        <div class="form-row">
+          <div class="form-group" id="f-birthday-group"><label class="form-label">生日</label><input class="form-control" type="date" id="f-birthday" /></div>
+          <div class="form-group"><label class="form-label">電話</label><input class="form-control" id="f-bphone" placeholder="02-00000000" /></div>
+        </div>
+        <div class="form-group" id="f-domicile-group"><label class="form-label" id="f-domicile-label">戶籍地</label><input class="form-control" id="f-domicile" placeholder="台北市○○區○○路○號" /></div>
+        <div class="form-group" id="f-residence-group">
+          <label class="form-label">現住地</label>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+            <input type="checkbox" id="f-same-residence" onchange="toggleResidence()" style="width:auto;">
+            <label for="f-same-residence" style="font-size:12px;color:#4a5568;margin:0;">同戶籍地</label>
+          </div>
+          <input class="form-control" id="f-residence" placeholder="（不同於戶籍地時填寫）">
+        </div>
+        <div class="form-group" id="f-comprep-group" style="display:none;"><label class="form-label">法定代理人</label><input class="form-control" id="f-comprep" placeholder="代表人姓名" /></div>
+      </div>
+    </div>
     <div class="form-group"><label class="form-label">Google Drive 資料夾連結</label><input class="form-control" id="f-gdlink" placeholder="https://drive.google.com/drive/folders/..." /></div>
     <div class="form-group"><label class="form-label">案件備註</label><textarea class="form-control" id="f-notes" rows="3"></textarea></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
       <button class="btn btn-outline" onclick="closeModal('case-modal')">取消</button>
       <button class="btn btn-primary" onclick="saveCase()">儲存案件</button>
     </div>
+  </div>
+</div>
+
+<!-- 系統設定 Modal -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal" style="width:560px;">
+    <div class="modal-title">⚙ 系統設定<button class="modal-close" onclick="closeModal('settings-modal')">✕</button></div>
+    <p style="font-size:12px;color:#718096;margin-bottom:16px;">以下資訊為平台/債權人基本資料，產出法院公文時自動帶入，填一次即可。</p>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">債權人名稱（公司名稱）</label>
+        <input class="form-control" id="set-name" placeholder="○○股份有限公司">
+      </div>
+      <div class="form-group">
+        <label class="form-label">統一編號</label>
+        <input class="form-control" id="set-cid" placeholder="12345678">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">法定代理人</label>
+        <input class="form-control" id="set-rep" placeholder="○○○">
+      </div>
+      <div class="form-group">
+        <label class="form-label">電話</label>
+        <input class="form-control" id="set-phone" placeholder="02-00000000">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">公司地址</label>
+      <input class="form-control" id="set-address" placeholder="台北市○○區○○路○號○樓">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">送達代收人</label>
+        <input class="form-control" id="set-agent" placeholder="○○○">
+      </div>
+      <div class="form-group">
+        <label class="form-label">送達處所</label>
+        <input class="form-control" id="set-agent-addr" placeholder="台北市○○區○○路○號">
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+      <button class="btn btn-outline" onclick="closeModal('settings-modal')">取消</button>
+      <button class="btn btn-primary" onclick="saveSettingsForm()">儲存設定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 公文選擇 Modal -->
+<div class="modal-overlay" id="doc-chooser-modal">
+  <div class="modal" style="width:440px;">
+    <div class="modal-title">📄 產出法院公文<button class="modal-close" onclick="closeModal('doc-chooser-modal')">✕</button></div>
+    <div id="doc-chooser-content" style="min-height:60px;"></div>
   </div>
 </div>
 
@@ -1024,6 +1109,15 @@ function onBorrowerTypeChange() {
   document.getElementById('f-idno-label').textContent = isCompany ? '統一編號' : '身分證字號';
   document.getElementById('f-idno').placeholder = isCompany ? '12345678（8碼）' : 'A123456789（10碼）';
   document.getElementById('f-idno').maxLength = isCompany ? 8 : 10;
+  // 法院公文欄位顯示切換
+  const birthdayGrp=document.getElementById('f-birthday-group');
+  const residenceGrp=document.getElementById('f-residence-group');
+  const comprepGrp=document.getElementById('f-comprep-group');
+  const domicileLabel=document.getElementById('f-domicile-label');
+  if(birthdayGrp) birthdayGrp.style.display=isCompany?'none':'';
+  if(residenceGrp) residenceGrp.style.display=isCompany?'none':'';
+  if(comprepGrp) comprepGrp.style.display=isCompany?'':'none';
+  if(domicileLabel) domicileLabel.textContent=isCompany?'公司地址':'戶籍地';
 }
 
 let guarantorCount = 0;
@@ -1035,13 +1129,20 @@ function addGuarantorRow(g={}) {
   row.className = 'guarantor-row';
   row.id = 'grow-'+idx;
   row.innerHTML = `
-    <select onchange="onGuarantorTypeChange(${idx})" style="min-width:80px;">
-      <option value="自然人" ${!isCompany?'selected':''}>👤 自然人</option>
-      <option value="法人"   ${ isCompany?'selected':''}>🏢 法人</option>
-    </select>
-    <input placeholder="${isCompany?'公司名稱':'姓名'}" value="${g.name||''}" data-field="name" />
-    <input placeholder="${isCompany?'統一編號（8碼）':'身分證字號（10碼）'}" value="${g.idno||''}" data-field="idno" maxlength="${isCompany?8:10}" />
-    <button type="button" class="btn btn-danger btn-sm" onclick="removeGuarantorRow(${idx})">✕</button>`;
+    <div class="grow-main">
+      <select onchange="onGuarantorTypeChange(${idx})" style="min-width:80px;width:auto;">
+        <option value="自然人" ${!isCompany?'selected':''}>👤 自然人</option>
+        <option value="法人"   ${ isCompany?'selected':''}>🏢 法人</option>
+      </select>
+      <input placeholder="${isCompany?'公司名稱':'姓名'}" value="${g.name||''}" data-field="name" />
+      <input placeholder="${isCompany?'統一編號（8碼）':'身分證字號（10碼）'}" value="${g.idno||''}" data-field="idno" maxlength="${isCompany?8:10}" />
+      <button type="button" class="btn btn-danger btn-sm" onclick="removeGuarantorRow(${idx})" style="white-space:nowrap;">✕</button>
+    </div>
+    <div class="grow-extra">
+      <input placeholder="${isCompany?'—':'生日（選填）'}" value="${g.birthday||''}" data-field="birthday" type="${isCompany?'text':'date'}" ${isCompany?'disabled style="background:#f0f0f0;cursor:not-allowed;"':''} />
+      <input placeholder="${isCompany?'公司地址（選填）':'戶籍地（選填）'}" value="${g.domicile||''}" data-field="domicile" />
+      <input placeholder="電話（選填）" value="${g.phone||''}" data-field="phone" />
+    </div>`;
   document.getElementById('guarantor-list').appendChild(row);
   document.getElementById('guarantor-empty').style.display='none';
 }
@@ -1049,11 +1150,20 @@ function onGuarantorTypeChange(idx) {
   const row = document.getElementById('grow-'+idx);
   const sel = row.querySelector('select');
   const isCompany = sel.value === '法人';
-  const nameInput = row.querySelectorAll('input')[0];
-  const idnoInput = row.querySelectorAll('input')[1];
-  nameInput.placeholder = isCompany ? '公司名稱' : '姓名';
-  idnoInput.placeholder = isCompany ? '統一編號（8碼）' : '身分證字號（10碼）';
-  idnoInput.maxLength = isCompany ? 8 : 10;
+  const inputs = [...row.querySelectorAll('input')];
+  // main row inputs
+  inputs[0].placeholder = isCompany ? '公司名稱' : '姓名';
+  inputs[1].placeholder = isCompany ? '統一編號（8碼）' : '身分證字號（10碼）';
+  inputs[1].maxLength = isCompany ? 8 : 10;
+  // extra row: birthday
+  inputs[2].placeholder = isCompany ? '—' : '生日（選填）';
+  inputs[2].type = isCompany ? 'text' : 'date';
+  inputs[2].disabled = isCompany;
+  inputs[2].style.background = isCompany ? '#f0f0f0' : '';
+  inputs[2].style.cursor = isCompany ? 'not-allowed' : '';
+  inputs[2].value = isCompany ? '' : inputs[2].value;
+  // extra row: domicile
+  inputs[3].placeholder = isCompany ? '公司地址（選填）' : '戶籍地（選填）';
 }
 function removeGuarantorRow(idx) {
   const row = document.getElementById('grow-'+idx);
@@ -1062,11 +1172,17 @@ function removeGuarantorRow(idx) {
     document.getElementById('guarantor-empty').style.display='block';
 }
 function getGuarantors() {
-  return [...document.getElementById('guarantor-list').children].map(row => ({
-    type: row.querySelector('select').value,
-    name: row.querySelectorAll('input')[0].value.trim(),
-    idno: row.querySelectorAll('input')[1].value.trim(),
-  })).filter(g => g.name);
+  return [...document.getElementById('guarantor-list').children].map(row => {
+    const inputs = [...row.querySelectorAll('input')];
+    return {
+      type: row.querySelector('select').value,
+      name: inputs[0].value.trim(),
+      idno: inputs[1].value.trim(),
+      birthday: inputs[2]?.value?.trim()||'',
+      domicile: inputs[3]?.value?.trim()||'',
+      phone: inputs[4]?.value?.trim()||'',
+    };
+  }).filter(g => g.name);
 }
 function renderGuarantorForm(guarantors=[]) {
   document.getElementById('guarantor-list').innerHTML='';
@@ -1075,6 +1191,44 @@ function renderGuarantorForm(guarantors=[]) {
     guarantors.forEach(g => addGuarantorRow(g));
   } else {
     document.getElementById('guarantor-empty').style.display='block';
+  }
+}
+
+function toggleCourtSection() {
+  const body=document.getElementById('court-section-body');
+  const arrow=document.getElementById('court-section-arrow');
+  const open=body.style.display==='none';
+  body.style.display=open?'block':'none';
+  arrow.textContent=open?'▾ 收起':'▸ 展開';
+}
+function toggleResidence() {
+  const same=document.getElementById('f-same-residence').checked;
+  document.getElementById('f-residence').disabled=same;
+  document.getElementById('f-residence').style.background=same?'#f0f0f0':'';
+  if(same) document.getElementById('f-residence').value='';
+}
+function clearCourtFields() {
+  ['f-birthday','f-bphone','f-domicile','f-residence','f-comprep'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  const cb=document.getElementById('f-same-residence'); if(cb) cb.checked=false;
+  toggleResidence();
+  // collapse section
+  document.getElementById('court-section-body').style.display='none';
+  document.getElementById('court-section-arrow').textContent='▸ 展開';
+}
+function loadCourtFields(c) {
+  document.getElementById('f-birthday').value=c.birthday||'';
+  document.getElementById('f-bphone').value=c.bphone||'';
+  document.getElementById('f-domicile').value=c.domicile||'';
+  const sameRes=!!(c.sameResidence);
+  document.getElementById('f-same-residence').checked=sameRes;
+  document.getElementById('f-residence').value=sameRes?'':c.residence||'';
+  document.getElementById('f-comprep').value=c.comprep||'';
+  toggleResidence();
+  // auto-expand if any court field is filled
+  const hasCourt=c.birthday||c.bphone||c.domicile||c.residence||c.comprep;
+  if(hasCourt){
+    document.getElementById('court-section-body').style.display='block';
+    document.getElementById('court-section-arrow').textContent='▾ 收起';
   }
 }
 
@@ -1088,6 +1242,7 @@ function openAddCase() {
   document.getElementById('f-stage').value='存證信函';
   document.getElementById('f-btype-person').checked=true;
   onBorrowerTypeChange();
+  clearCourtFields();
   renderGuarantorForm([]);
   openModal('case-modal');
 }
@@ -1103,20 +1258,26 @@ function editCase(id) {
   document.getElementById('f-stage').value=c.stage; document.getElementById('f-court').value=c.court||'';
   document.getElementById('f-lawyer').value=c.lawyer||''; document.getElementById('f-casenumber').value=c.casenumber||'';
   document.getElementById('f-gdlink').value=c.gdlink||''; document.getElementById('f-notes').value=c.notes||'';
-  // 借款人類型
-  const isCompany = c.borrowerType==='法人';
+  const isCompany=c.borrowerType==='法人';
   document.getElementById(isCompany?'f-btype-company':'f-btype-person').checked=true;
   onBorrowerTypeChange();
-  // 共同發票人
+  loadCourtFields(c);
   renderGuarantorForm(c.guarantors||[]);
   openModal('case-modal');
 }
 function saveCase() {
-  const borrowerType = document.querySelector('input[name="f-btype"]:checked').value;
+  const borrowerType=document.querySelector('input[name="f-btype"]:checked').value;
+  const sameRes=document.getElementById('f-same-residence').checked;
   const data={
     id:document.getElementById('f-id').value.trim(), date:document.getElementById('f-date').value,
     name:document.getElementById('f-name').value.trim(), idno:document.getElementById('f-idno').value.trim(),
     borrowerType, guarantors:getGuarantors(),
+    birthday:document.getElementById('f-birthday').value,
+    bphone:document.getElementById('f-bphone').value.trim(),
+    domicile:document.getElementById('f-domicile').value.trim(),
+    sameResidence:sameRes,
+    residence:sameRes?'':document.getElementById('f-residence').value.trim(),
+    comprep:document.getElementById('f-comprep').value.trim(),
     amount:Number(document.getElementById('f-amount').value)||0, interest:Number(document.getElementById('f-interest').value)||0, days:calcDays(document.getElementById('f-date').value),
     stage:document.getElementById('f-stage').value, court:document.getElementById('f-court').value.trim(),
     lawyer:document.getElementById('f-lawyer').value.trim(), casenumber:document.getElementById('f-casenumber').value.trim(),
@@ -1249,6 +1410,7 @@ function viewDetail(id) {
       <button class="btn btn-primary" onclick="closeModal('detail-modal');openAddRecoveryFor('${c.id}')">💰 記錄催回本金</button>
       <button class="btn btn-teal" onclick="closeModal('detail-modal');openAddPaymentFor('${c.id}')">📥 記錄費用收款</button>
       <button class="btn btn-warning" onclick="closeModal('detail-modal');editCase('${c.id}')">編輯案件</button>
+      <button class="btn btn-purple" onclick="closeModal('detail-modal');openDocChooser('${c.id}')">📄 產出公文</button>
     </div>`;
   openModal('detail-modal');
 }
@@ -1797,6 +1959,280 @@ function appendToNotes(caseId, text) {
   if (notesEl) notesEl.textContent = c.notes;
   alert(`✅ 已貼入備註：${newLine}`);
   refresh();
+}
+
+// ── 系統設定 ──────────────────────────────────────
+const SETTINGS_KEY='bznk_settings_v1';
+function loadSettings(){try{return JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}');}catch(e){return{};}}
+function saveSettingsFn(s){localStorage.setItem(SETTINGS_KEY,JSON.stringify(s));}
+
+function openSettings(){
+  const s=loadSettings();
+  document.getElementById('set-name').value=s.creditorName||'';
+  document.getElementById('set-cid').value=s.creditorId||'';
+  document.getElementById('set-rep').value=s.legalRep||'';
+  document.getElementById('set-phone').value=s.phone||'';
+  document.getElementById('set-address').value=s.address||'';
+  document.getElementById('set-agent').value=s.agent||'';
+  document.getElementById('set-agent-addr').value=s.agentAddr||'';
+  openModal('settings-modal');
+}
+function saveSettingsForm(){
+  saveSettingsFn({
+    creditorName:document.getElementById('set-name').value.trim(),
+    creditorId:document.getElementById('set-cid').value.trim(),
+    legalRep:document.getElementById('set-rep').value.trim(),
+    phone:document.getElementById('set-phone').value.trim(),
+    address:document.getElementById('set-address').value.trim(),
+    agent:document.getElementById('set-agent').value.trim(),
+    agentAddr:document.getElementById('set-agent-addr').value.trim(),
+  });
+  closeModal('settings-modal');
+  alert('✅ 設定已儲存');
+}
+
+// ── 公文模板目錄 ──────────────────────────────────
+const DOC_TEMPLATES=[
+  {key:'promissory_note',label:'聲請裁定本票強制執行狀',stages:['本票裁定'],fn:'genPromissoryNoteDoc'},
+];
+
+function openDocChooser(caseId){
+  const c=loadCases().find(x=>x.id===caseId);
+  if(!c) return;
+  const avail=DOC_TEMPLATES.filter(t=>t.stages.includes(c.stage));
+  const el=document.getElementById('doc-chooser-content');
+  if(avail.length===0){
+    el.innerHTML=`<div style="text-align:center;padding:24px;color:#718096;">
+      <div style="font-size:32px;margin-bottom:8px;">📂</div>
+      目前階段「<strong>${c.stage}</strong>」尚無可用公文範本。<br>
+      <span style="font-size:12px;">後續將依階段陸續新增</span>
+    </div>`;
+  } else {
+    el.innerHTML=avail.map(t=>`
+      <div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-weight:600;font-size:14px;color:#1a202c;">${t.label}</div>
+          <div style="font-size:12px;color:#718096;margin-top:3px;">適用階段：${t.stages.join('、')}</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="generateDoc('${caseId}','${t.key}')">產出預覽</button>
+      </div>`).join('');
+  }
+  openModal('doc-chooser-modal');
+}
+
+function generateDoc(caseId,templateKey){
+  const t=DOC_TEMPLATES.find(x=>x.key===templateKey);
+  if(!t) return;
+  const c=loadCases().find(x=>x.id===caseId);
+  if(!c) return;
+  const s=loadSettings();
+  if(!s.creditorName){
+    if(confirm('尚未設定債權人資訊，是否前往設定？')){
+      closeModal('doc-chooser-modal');
+      openSettings();
+    }
+    return;
+  }
+  const html=window[t.fn](c,s);
+  const w=window.open('','_blank','width=900,height=800');
+  w.document.write(html);
+  w.document.close();
+  closeModal('doc-chooser-modal');
+}
+
+// ── 民國日期工具 ──────────────────────────────────
+function rocToday(){
+  const d=new Date();
+  return {y:d.getFullYear()-1911,m:String(d.getMonth()+1).padStart(2,'0'),day:String(d.getDate()).padStart(2,'0')};
+}
+function fmtMoney(n){return Number(n||0).toLocaleString('zh-TW');}
+function blank(w){return `<span contenteditable="true" style="min-width:${w||24}px;display:inline-block;border-bottom:1px dashed #999;outline:none;">&nbsp;</span>`;}
+
+// ── 公文：聲請裁定本票強制執行狀 ─────────────────
+function genPromissoryNoteDoc(c,s){
+  const roc=rocToday();
+  const idType=c.borrowerType==='法人'?'☑ 營利事業登記':'☑ 國民身分證';
+  function rocDate(str){
+    if(!str) return {y:'',m:'',d:''};
+    const [y,m,d]=str.split('-').map(Number);
+    return {y:y-1911,m:String(m).padStart(2,'0'),d:String(d).padStart(2,'0')};
+  }
+  function eb(v,w){return v?v:`<span contenteditable="true" style="min-width:${w||24}px;display:inline-block;border-bottom:1px dashed #999;outline:none;">&nbsp;</span>`;}
+  const bd=rocDate(c.birthday);
+  const domicileTxt=c.domicile?c.domicile:eb('',200);
+  const residenceTxt=c.sameResidence?'□ 同戶籍地':(c.residence?c.residence:eb('',200));
+  const guarantorRows=(c.guarantors||[]).map((g,i)=>{
+    const gbd=rocDate(g.birthday);
+    const isPerson=g.type!=='法人';
+    return `
+    <tr><td colspan="2" style="height:8px;"></td></tr>
+    <tr>
+      <td style="padding:3px 6px;vertical-align:top;white-space:nowrap;width:200px;">
+        相對人${i+2}　${g.name}<br>
+        <span style="font-size:10pt;color:#555;">（${g.type}）</span>
+      </td>
+      <td style="padding:3px 6px;vertical-align:top;">
+        身分證明文件：${g.type==='法人'?'☑ 營利事業登記':'☑ 國民身分證'}<br>
+        證號：${g.idno||eb('',80)}<br>
+        ${isPerson?`性別：${eb('',32)}<br>
+        生日：${gbd.y?`${gbd.y}年${gbd.m}月${gbd.d}日`:`${eb('',36)}年${eb('',24)}月${eb('',24)}日`}<br>`:''}
+        ${g.type==='法人'?'公司地址':'戶籍地'}：${g.domicile?g.domicile:eb('',200)}<br>
+        電話：${g.phone?g.phone:eb('',120)}
+      </td>
+    </tr>`;
+  }).join('');
+
+  return `<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>聲請裁定本票強制執行狀 - ${c.name}</title>
+<style>
+@page{size:A4;margin:2cm 2.5cm;}
+@media print{
+  .toolbar{display:none!important;}
+  body{background:white;margin:0;}
+  [contenteditable]{border-bottom:none!important;outline:none!important;}
+}
+*{box-sizing:border-box;}
+body{font-family:'標楷體','DFKai-SB',serif;font-size:13pt;line-height:2;color:#000;background:#edf2f7;margin:0;}
+.toolbar{position:fixed;top:0;left:0;right:0;background:#1a365d;color:white;padding:10px 20px;display:flex;align-items:center;gap:12px;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.3);font-family:-apple-system,sans-serif;font-size:13px;}
+.doc{max-width:780px;margin:64px auto 60px;padding:50px 60px;background:white;box-shadow:0 2px 16px rgba(0,0,0,.1);}
+h1{text-align:center;font-size:18pt;font-weight:bold;letter-spacing:6px;margin:0 0 20px;}
+.meta{display:flex;gap:48px;margin-bottom:10px;}
+.party-tbl{width:100%;border-collapse:collapse;margin:8px 0 14px;}
+.party-tbl td{padding:2px 6px;vertical-align:top;}
+.sec-title{font-weight:bold;margin:18px 0 6px;}
+.item{padding-left:2em;text-indent:-2em;margin-bottom:6px;}
+.seal{display:inline-block;width:54px;height:54px;border:1px solid #555;vertical-align:middle;margin-left:6px;}
+[contenteditable]{outline:none;border-bottom:1px dashed #999;min-width:24px;display:inline-block;cursor:text;}
+[contenteditable]:focus{border-bottom-color:#3182ce;background:#ebf8ff;border-radius:2px;}
+.att-table{width:100%;border-collapse:collapse;font-size:11pt;}
+.att-table th,.att-table td{border:1px solid #000;padding:5px 8px;text-align:center;}
+.att-table th{background:#f0f0f0;font-weight:bold;}
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <span>📄 聲請裁定本票強制執行狀 ─ ${c.name}</span>
+  <span style="flex:1"></span>
+  <span style="font-size:11px;opacity:.7;">點擊任意欄位可直接修改</span>
+  <button onclick="window.print()" style="background:#38a169;color:white;border:none;padding:7px 20px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">🖨 列印／存成 PDF</button>
+  <button onclick="window.close()" style="background:rgba(255,255,255,.15);color:white;border:none;padding:7px 14px;border-radius:6px;cursor:pointer;font-size:13px;">✕ 關閉</button>
+</div>
+<div class="doc">
+  <h1>聲請裁定本票強制執行狀</h1>
+
+  <div class="meta">
+    <span>案號：<span contenteditable="true" style="min-width:36px;display:inline-block;border-bottom:1px dashed #999;outline:none;">&nbsp;</span>年度
+      <span contenteditable="true" style="min-width:48px;display:inline-block;border-bottom:1px dashed #999;outline:none;">&nbsp;</span>字第
+      <span contenteditable="true" style="min-width:48px;display:inline-block;border-bottom:1px dashed #999;outline:none;">&nbsp;</span>號</span>
+    <span>承辦股別：<span contenteditable="true" style="min-width:32px;display:inline-block;border-bottom:1px dashed #999;outline:none;">&nbsp;</span></span>
+  </div>
+
+  <div style="margin-bottom:12px;">訴訟標的金額或價額：新臺幣 <strong>${fmtMoney(c.amount)}</strong> 元</div>
+
+  <table class="party-tbl">
+    <tr>
+      <td style="width:200px;vertical-align:top;white-space:nowrap;">
+        聲請人　${s.creditorName}<br>
+        <span style="font-size:10pt;color:#555;">（即債權人）</span>
+      </td>
+      <td style="vertical-align:top;">
+        身分證明文件：☑ 營利事業登記<br>
+        證號：${s.creditorId||'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'}<br>
+        法定代理人：${s.legalRep||'&nbsp;&nbsp;&nbsp;&nbsp;'}<br>
+        地址：${s.address||'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'}<br>
+        電話：${s.phone||'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'}<br>
+        送達代收人：${s.agent||'&nbsp;&nbsp;&nbsp;&nbsp;'}<br>
+        送達處所：${s.agentAddr||'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'}
+      </td>
+    </tr>
+    <tr><td colspan="2" style="height:10px;"></td></tr>
+    <tr>
+      <td style="width:200px;vertical-align:top;white-space:nowrap;">
+        相對人1　${c.name}<br>
+        <span style="font-size:10pt;color:#555;">（即債務人）</span>
+      </td>
+      <td style="vertical-align:top;">
+        身分證明文件：${idType}<br>
+        證號：${c.idno||eb('',80)}<br>
+        ${c.borrowerType!=='法人'?`性別：${eb('',32)}<br>
+        生日：${bd.y?`${bd.y}年${bd.m}月${bd.d}日`:`${eb('',36)}年${eb('',24)}月${eb('',24)}日`}<br>`:`法定代理人：${c.comprep||eb('',80)}<br>`}
+        ${c.borrowerType==='法人'?'公司地址':'戶籍地'}：${domicileTxt}<br>
+        ${c.borrowerType!=='法人'?`現住地：${residenceTxt}<br>`:''}
+        電話：${c.bphone||eb('',120)}
+      </td>
+    </tr>
+    ${guarantorRows}
+  </table>
+
+  <div style="text-align:center;font-weight:bold;margin:16px 0 10px;font-size:14pt;">為聲請裁定本票強制執行事：</div>
+
+  <div class="sec-title">聲請事項</div>
+  <div class="item">一、裁定相對人簽發如附表所載本票金額新臺幣 <strong>${fmtMoney(c.amount)}</strong> 元整，及自提示日<span contenteditable="true" style="min-width:36px;display:inline-block;border-bottom:1px dashed #999;outline:none;">&nbsp;</span>年<span contenteditable="true" style="min-width:24px;display:inline-block;border-bottom:1px dashed #999;outline:none;">&nbsp;</span>月<span contenteditable="true" style="min-width:24px;display:inline-block;border-bottom:1px dashed #999;outline:none;">&nbsp;</span>日起至清償日止按週年利率百分之<span contenteditable="true" style="min-width:32px;display:inline-block;border-bottom:1px dashed #999;outline:none;">十六</span>計算之利息，准予強制執行。</div>
+  <div class="item">二、聲請程序費用由相對人負擔。</div>
+
+  <div class="sec-title">事實及理由</div>
+  <div style="text-indent:2em;">聲請人持有相對人簽發如附表所載本票<span contenteditable="true" style="min-width:24px;display:inline-block;border-bottom:1px dashed #999;outline:none;">&nbsp;</span>張，均已屆期，經提示未獲付款。聲請人雖屢為催討，仍未蒙置理。為此依據票據法第123條、非訟事件法第194條規定，聲請裁定准予強制執行，以保權益。</div>
+
+  <div style="margin-top:14px;">證物名稱及件數：本票正本<span contenteditable="true" style="min-width:24px;display:inline-block;border-bottom:1px dashed #999;outline:none;">&nbsp;</span>張。</div>
+
+  <div style="text-align:center;margin-top:28px;font-size:14pt;">此　　致</div>
+  <div style="text-align:center;font-size:14pt;">${c.court?c.court:'○○○○'}地方法院民事庭　公鑒</div>
+
+  <div style="text-align:right;margin-top:20px;">中華民國　${roc.y}　年　${roc.m}　月　${roc.day}　日</div>
+
+  <div style="margin-top:28px;text-align:right;line-height:2.4;">
+    <div>具狀人　${s.creditorName}　<span class="seal"></span></div>
+    <div>撰狀人　${s.agent||'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'}　<span class="seal"></span></div>
+  </div>
+
+  <hr style="margin:36px 0 16px;border:none;border-top:1.5px solid #000;">
+  <div style="text-align:center;font-weight:bold;font-size:14pt;margin-bottom:10px;">附　　表</div>
+  <table class="att-table">
+    <thead>
+      <tr>
+        <th style="width:40px;">編號</th>
+        <th>發票人</th>
+        <th>發票日</th>
+        <th>到期日</th>
+        <th>票面金額（元）</th>
+        <th>提示日</th>
+        <th>備註</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td contenteditable="true">${c.name}</td>
+        <td contenteditable="true">&nbsp;</td>
+        <td contenteditable="true">&nbsp;</td>
+        <td contenteditable="true" style="text-align:right;">${fmtMoney(c.amount)}</td>
+        <td contenteditable="true">&nbsp;</td>
+        <td contenteditable="true">&nbsp;</td>
+      </tr>
+      <tr>
+        <td contenteditable="true">2</td>
+        <td contenteditable="true">&nbsp;</td>
+        <td contenteditable="true">&nbsp;</td>
+        <td contenteditable="true">&nbsp;</td>
+        <td contenteditable="true">&nbsp;</td>
+        <td contenteditable="true">&nbsp;</td>
+        <td contenteditable="true">&nbsp;</td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="4" style="text-align:right;font-weight:bold;">合計</td>
+        <td contenteditable="true" style="text-align:right;font-weight:bold;">${fmtMoney(c.amount)}</td>
+        <td colspan="2"></td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+</body>
+</html>`;
 }
 
 // ── Firebase Auth ─────────────────────────────────
