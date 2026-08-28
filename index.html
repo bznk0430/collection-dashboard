@@ -437,12 +437,26 @@
       <div id="guarantor-empty" style="font-size:12px;color:#a0aec0;text-align:center;padding:8px;">無共同發票人</div>
     </div>
     <div class="form-row">
+      <div class="form-group"><label class="form-label">本票金額（元）</label><input class="form-control" type="number" id="f-note-amount" placeholder="0（存證信函、本票裁定用）" /></div>
       <div class="form-group"><label class="form-label">逾期本金（元）</label><input class="form-control" type="number" id="f-amount" placeholder="0" oninput="updateCaseTotal()" /></div>
-      <div class="form-group"><label class="form-label">利息金額（元）</label><input class="form-control" type="number" id="f-interest" placeholder="0（可留空）" oninput="updateCaseTotal()" /></div>
     </div>
     <div class="form-row">
+      <div class="form-group"><label class="form-label">利息金額（元）</label><input class="form-control" type="number" id="f-interest" placeholder="0（可留空）" oninput="updateCaseTotal()" /></div>
       <div class="form-group"><label class="form-label" style="color:#718096;">逾期天數</label><input class="form-control" id="f-days-display" readonly style="background:#f7fafc;color:#718096;cursor:default;" placeholder="依登記日期自動計算" /></div>
+    </div>
+    <div class="form-row">
       <div class="form-group"><label class="form-label" style="color:#718096;">本金＋利息合計</label><input class="form-control" id="f-total-display" readonly style="background:#f7fafc;color:#718096;cursor:default;" placeholder="自動加總" /></div>
+      <div class="form-group" id="f-birthday-group"><label class="form-label">生日</label><input class="form-control" type="date" id="f-birthday" /></div>
+      <div class="form-group" id="f-comprep-group" style="display:none;"><label class="form-label">法定代理人</label><input class="form-control" id="f-comprep" placeholder="代表人姓名" /></div>
+    </div>
+    <div class="form-group" id="f-domicile-group"><label class="form-label" id="f-domicile-label">戶籍地</label><input class="form-control" id="f-domicile" placeholder="台北市○○區○○路○號" /></div>
+    <div class="form-group" id="f-residence-group">
+      <label class="form-label">現住地</label>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+        <input type="checkbox" id="f-same-residence" onchange="toggleResidence()" style="width:auto;">
+        <label for="f-same-residence" style="font-size:12px;color:#4a5568;margin:0;">同戶籍地</label>
+      </div>
+      <input class="form-control" id="f-residence" placeholder="（不同於戶籍地時填寫）">
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">催收階段</label>
@@ -458,29 +472,14 @@
       <div class="form-group"><label class="form-label">委辦律師/機構</label><input class="form-control" id="f-lawyer" /></div>
       <div class="form-group"><label class="form-label">案件字號</label><input class="form-control" id="f-casenumber" placeholder="例：114年度執字第12345號" /></div>
     </div>
-    <!-- 法院公文資料（折疊） -->
+    <!-- 其他聯絡資料（折疊） -->
     <div class="court-section">
       <div class="court-section-toggle" onclick="toggleCourtSection()">
-        <span>📋 法院公文資料（選填）</span>
+        <span>📋 其他聯絡資料（選填）</span>
         <span id="court-section-arrow">▸ 展開</span>
       </div>
       <div class="court-section-body" id="court-section-body" style="display:none;">
-        <!-- 借款人個人資料 -->
-        <div style="font-size:11px;font-weight:700;color:#276749;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;margin-top:2px;">借款人聯絡資料</div>
-        <div class="form-row">
-          <div class="form-group" id="f-birthday-group"><label class="form-label">生日</label><input class="form-control" type="date" id="f-birthday" /></div>
-          <div class="form-group"><label class="form-label">電話</label><input class="form-control" id="f-bphone" placeholder="02-00000000" /></div>
-        </div>
-        <div class="form-group" id="f-domicile-group"><label class="form-label" id="f-domicile-label">戶籍地</label><input class="form-control" id="f-domicile" placeholder="台北市○○區○○路○號" /></div>
-        <div class="form-group" id="f-residence-group">
-          <label class="form-label">現住地</label>
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-            <input type="checkbox" id="f-same-residence" onchange="toggleResidence()" style="width:auto;">
-            <label for="f-same-residence" style="font-size:12px;color:#4a5568;margin:0;">同戶籍地</label>
-          </div>
-          <input class="form-control" id="f-residence" placeholder="（不同於戶籍地時填寫）">
-        </div>
-        <div class="form-group" id="f-comprep-group" style="display:none;"><label class="form-label">法定代理人</label><input class="form-control" id="f-comprep" placeholder="代表人姓名" /></div>
+        <div class="form-group"><label class="form-label">借款人電話</label><input class="form-control" id="f-bphone" placeholder="02-00000000" /></div>
       </div>
     </div>
     <div class="form-group"><label class="form-label">Google Drive 資料夾連結</label><input class="form-control" id="f-gdlink" placeholder="https://drive.google.com/drive/folders/..." /></div>
@@ -1237,7 +1236,7 @@ function openAddCase() {
   document.getElementById('modal-title-text').textContent='新增催收案件';
   document.getElementById('f-id').value=genId();
   document.getElementById('f-date').value=today();
-  ['f-name','f-idno','f-amount','f-interest','f-court','f-lawyer','f-casenumber','f-gdlink','f-notes'].forEach(id=>document.getElementById(id).value='');
+  ['f-name','f-idno','f-note-amount','f-amount','f-interest','f-court','f-lawyer','f-casenumber','f-gdlink','f-notes'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-days-display').value='';
   document.getElementById('f-stage').value='存證信函';
   document.getElementById('f-btype-person').checked=true;
@@ -1252,7 +1251,7 @@ function editCase(id) {
   document.getElementById('modal-title-text').textContent='編輯催收案件';
   document.getElementById('f-id').value=c.id; document.getElementById('f-date').value=c.date;
   document.getElementById('f-name').value=c.name; document.getElementById('f-idno').value=c.idno||'';
-  document.getElementById('f-amount').value=c.amount; document.getElementById('f-interest').value=c.interest||'';
+  document.getElementById('f-note-amount').value=c.noteAmount||''; document.getElementById('f-amount').value=c.amount; document.getElementById('f-interest').value=c.interest||'';
   document.getElementById('f-days-display').value=calcDays(c.date)+' 天';
   updateCaseTotal();
   document.getElementById('f-stage').value=c.stage; document.getElementById('f-court').value=c.court||'';
@@ -1278,6 +1277,7 @@ function saveCase() {
     sameResidence:sameRes,
     residence:sameRes?'':document.getElementById('f-residence').value.trim(),
     comprep:document.getElementById('f-comprep').value.trim(),
+    noteAmount:Number(document.getElementById('f-note-amount').value)||0,
     amount:Number(document.getElementById('f-amount').value)||0, interest:Number(document.getElementById('f-interest').value)||0, days:calcDays(document.getElementById('f-date').value),
     stage:document.getElementById('f-stage').value, court:document.getElementById('f-court').value.trim(),
     lawyer:document.getElementById('f-lawyer').value.trim(), casenumber:document.getElementById('f-casenumber').value.trim(),
@@ -1352,6 +1352,7 @@ function viewDetail(id) {
         <div class="value">${c.name} <span class="badge badge-${c.borrowerType||'自然人'}" style="margin-left:4px;">${c.borrowerType==='法人'?'🏢 法人':'👤 自然人'}</span></div>
       </div>
       <div class="detail-item"><div class="label">${c.borrowerType==='法人'?'統一編號':'身分證字號'}</div><div class="value" style="font-family:monospace;">${c.idno||'—'}</div></div>
+      <div class="detail-item"><div class="label">本票金額</div><div class="value" style="color:#6b21a8;">${c.noteAmount?fmtMoney(c.noteAmount):'<span style=\'color:#a0aec0;\'>未設定</span>'}</div></div>
       <div class="detail-item"><div class="label">逾期本金</div><div class="value" style="color:#c53030;">${fmtMoney(c.amount)}<span style="font-size:12px;color:#718096;font-weight:400;margin-left:8px;">逾期 ${calcDays(c.date)} 天</span></div></div>
       <div class="detail-item"><div class="label">利息金額</div><div class="value" style="color:#c05621;">${c.interest?fmtMoney(c.interest):'<span style=\'color:#a0aec0;\'>未設定</span>'}</div></div>
       <div class="detail-item"><div class="label">催收階段</div><div class="value"><span class="badge badge-${c.stage}">${c.stage}</span></div></div>
@@ -2139,7 +2140,7 @@ h1{text-align:center;font-size:18pt;font-weight:bold;letter-spacing:6px;margin:0
     <span>承辦股別：<span contenteditable="true">&emsp;</span></span>
   </div>
 
-  <div style="margin-bottom:12px;">訴訟標的金額或價額：新臺幣 <strong>${fmtMoney(c.amount)}</strong> 元</div>
+  <div style="margin-bottom:12px;">訴訟標的金額或價額：新臺幣 <strong>${fmtMoney(c.noteAmount||c.amount)}</strong> 元</div>
 
   <table class="party-tbl">
     <tr>
@@ -2179,7 +2180,7 @@ h1{text-align:center;font-size:18pt;font-weight:bold;letter-spacing:6px;margin:0
   <div style="text-align:center;font-weight:bold;margin:16px 0 10px;font-size:14pt;">為聲請裁定本票強制執行事：</div>
 
   <div class="sec-title">聲請事項</div>
-  <div class="item">一、裁定相對人簽發如附表所載本票金額新臺幣 <strong>${fmtMoney(c.amount)}</strong> 元整，及自提示日<span contenteditable="true">&emsp;&emsp;</span>年<span contenteditable="true">&emsp;</span>月<span contenteditable="true">&emsp;</span>日起至清償日止按週年利率百分之<span contenteditable="true">十六</span>計算之利息，准予強制執行。</div>
+  <div class="item">一、裁定相對人簽發如附表所載本票金額新臺幣 <strong>${fmtMoney(c.noteAmount||c.amount)}</strong> 元整，及自提示日<span contenteditable="true">&emsp;&emsp;</span>年<span contenteditable="true">&emsp;</span>月<span contenteditable="true">&emsp;</span>日起至清償日止按週年利率百分之<span contenteditable="true">十六</span>計算之利息，准予強制執行。</div>
   <div class="item">二、聲請程序費用由相對人負擔。</div>
 
   <div class="sec-title">事實及理由</div>
@@ -2214,7 +2215,7 @@ h1{text-align:center;font-size:18pt;font-weight:bold;letter-spacing:6px;margin:0
         <td><span contenteditable="true">${i===0?c.name:' '}</span></td>
         <td><span contenteditable="true">${i===0?' ':' '}</span></td>
         <td><span contenteditable="true"> </span></td>
-        <td style="text-align:right;"><span contenteditable="true">${i===0?fmtMoney(c.amount):' '}</span></td>
+        <td style="text-align:right;"><span contenteditable="true">${i===0?fmtMoney(c.noteAmount||c.amount):' '}</span></td>
         <td><span contenteditable="true"> </span></td>
         <td><span contenteditable="true"> </span></td>
       </tr>`).join('')}
@@ -2222,7 +2223,7 @@ h1{text-align:center;font-size:18pt;font-weight:bold;letter-spacing:6px;margin:0
     <tfoot>
       <tr>
         <td colspan="4" style="text-align:right;font-weight:bold;border-right:none;">合計</td>
-        <td style="text-align:right;font-weight:bold;"><span contenteditable="true">${fmtMoney(c.amount)}</span></td>
+        <td style="text-align:right;font-weight:bold;"><span contenteditable="true">${fmtMoney(c.noteAmount||c.amount)}</span></td>
         <td colspan="2"></td>
       </tr>
     </tfoot>
@@ -2260,7 +2261,7 @@ function genCertifiedLetterDoc(c,s){
   }
 
   // ── 建立內文字元陣列 ──────────────────────────────
-  const amtCN=numToChinese(Math.floor(Number(c.amount)||0));
+  const amtCN=numToChinese(Math.floor(Number(c.noteAmount||c.amount)||0));
   const f=str=>str.split('').map(ch=>({ch,type:'fixed'}));
   const b=()=>({ch:'',type:'blank'});
 
