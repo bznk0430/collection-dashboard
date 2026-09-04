@@ -545,6 +545,19 @@
   </div>
 </div>
 
+<!-- 強制執行狀執行標的選擇 Modal -->
+<div class="modal-overlay" id="enforcement-options-modal">
+  <div class="modal" style="width:480px;">
+    <div class="modal-title">⚖️ 選擇執行標的<button class="modal-close" onclick="closeModal('enforcement-options-modal')">✕</button></div>
+    <div style="padding:4px 0 12px;font-size:13px;color:#718096;">請勾選本次聲請的執行標的（可複選）</div>
+    <div id="enforcement-options-body"></div>
+    <div style="margin-top:18px;display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn" onclick="closeModal('enforcement-options-modal')">取消</button>
+      <button class="btn btn-primary" onclick="submitEnforcementDoc()">產出預覽</button>
+    </div>
+  </div>
+</div>
+
 <!-- 案件詳情 Modal -->
 <div class="modal-overlay" id="detail-modal">
   <div class="modal" style="width:740px;">
@@ -1996,6 +2009,7 @@ function saveSettingsForm(){
 const DOC_TEMPLATES=[
   {key:'promissory_note',label:'聲請裁定本票強制執行狀',stages:['本票裁定'],fn:'genPromissoryNoteDoc'},
   {key:'certified_letter',label:'存證信函',stages:['存證信函'],fn:'genCertifiedLetterDoc'},
+  {key:'enforcement',label:'民事聲請強制執行狀',stages:['強制執行'],fn:'genEnforcementDoc'},
 ];
 
 function openDocChooser(caseId){
@@ -2033,6 +2047,11 @@ function generateDoc(caseId,templateKey){
       closeModal('doc-chooser-modal');
       openSettings();
     }
+    return;
+  }
+  if(t.key==='enforcement'){
+    closeModal('doc-chooser-modal');
+    openEnforcementOptions(caseId);
     return;
   }
   const html=window[t.fn](c,s);
@@ -2439,6 +2458,305 @@ body{font-family:'標楷體','DFKai-SB',serif;font-size:10pt;background:#e2e8f0;
       <div class="ni">三、每件一式三份，用不脫色筆或打字機複寫，或書寫後複印、影印，每格限書一字，色澤明顯、字跡端正。</div>
     </div>
   </div>
+</div>
+</body>
+</html>`;
+}
+
+// ── 強制執行狀 — 執行標的選擇 UI ─────────────────
+let _enforcementCaseId=null;
+
+function openEnforcementOptions(caseId){
+  _enforcementCaseId=caseId;
+  document.getElementById('enforcement-options-body').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;">
+        <input type="checkbox" id="enf-t1" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;">
+        <div>
+          <div style="font-weight:600;font-size:14px;color:#1a202c;">（一）查封拍賣不動產</div>
+          <div style="font-size:12px;color:#718096;margin-top:2px;">請求查封拍賣債務人所有如附表所示之不動產</div>
+        </div>
+      </label>
+      <div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;">
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+          <input type="checkbox" id="enf-t2" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;" onchange="document.getElementById('enf-bank-row').style.display=this.checked?'flex':'none'">
+          <div>
+            <div style="font-weight:600;font-size:14px;color:#1a202c;">（二）扣押銀行存款及利息</div>
+            <div style="font-size:12px;color:#718096;margin-top:2px;">請求扣押存放於第三人銀行之存款及利息所得</div>
+          </div>
+        </label>
+        <div id="enf-bank-row" style="display:none;gap:8px;margin-top:10px;padding-left:26px;">
+          <input id="enf-bank" class="form-control" style="font-size:13px;flex:1;" placeholder="銀行名稱（如：台灣銀行）">
+          <input id="enf-branch" class="form-control" style="font-size:13px;width:110px;" placeholder="分行">
+        </div>
+      </div>
+      <div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;">
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+          <input type="checkbox" id="enf-t3" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;" onchange="document.getElementById('enf-employer-row').style.display=this.checked?'block':'none'">
+          <div>
+            <div style="font-weight:600;font-size:14px;color:#1a202c;">（三）扣押薪資（三分之一）</div>
+            <div style="font-size:12px;color:#718096;margin-top:2px;">債務人現服務於第三人，請就薪資三分之一範圍內扣押</div>
+          </div>
+        </label>
+        <div id="enf-employer-row" style="display:none;margin-top:10px;padding-left:26px;">
+          <input id="enf-employer" class="form-control" style="font-size:13px;width:100%;" placeholder="雇主 / 第三人名稱">
+        </div>
+      </div>
+    </div>`;
+  openModal('enforcement-options-modal');
+}
+
+function submitEnforcementDoc(){
+  if(!_enforcementCaseId) return;
+  const t1=document.getElementById('enf-t1').checked;
+  const t2=document.getElementById('enf-t2').checked;
+  const t3=document.getElementById('enf-t3').checked;
+  if(!t1&&!t2&&!t3){ alert('請至少勾選一項執行標的'); return; }
+  const opts={
+    bank:(document.getElementById('enf-bank').value||'').trim(),
+    branch:(document.getElementById('enf-branch').value||'').trim(),
+    employer:(document.getElementById('enf-employer').value||'').trim(),
+  };
+  const c=loadCases().find(x=>x.id===_enforcementCaseId);
+  const s=loadSettings();
+  const html=genEnforcementDoc(c,s,[t1,t2,t3],opts);
+  const w=window.open('','_blank','width=900,height=800');
+  w.document.write(html);
+  w.document.close();
+  closeModal('enforcement-options-modal');
+}
+
+// ── 公文：民事聲請強制執行狀 ─────────────────────
+function genEnforcementDoc(c,s,targets,opts){
+  const roc=rocToday();
+  function eb(v,w){
+    if(v) return `<span contenteditable="true">${v}</span>`;
+    const sp=w>150?'&emsp;&emsp;&emsp;&emsp;&emsp;':w>80?'&emsp;&emsp;&emsp;':w>50?'&emsp;&emsp;':'&emsp;';
+    return `<span contenteditable="true">${sp}</span>`;
+  }
+  // 訴訟標的金額
+  const amt=c.noteAmount||c.amount||0;
+  const fmtAmt=amt?amt.toLocaleString('zh-TW'):'';
+  // 借款人資訊
+  const name=c.name||'';
+  const idno=c.idno||'';
+  const addr=c.residence&&!c.sameResidence?c.residence:(c.domicile||'');
+  // 第三人清單
+  const thirdParties=[];
+  if(targets[1]){
+    const bn=(opts.bank||'')+(opts.branch?opts.branch+'分行':'');
+    thirdParties.push({label:bn||'銀行',type:'bank'});
+  }
+  if(targets[2]){
+    thirdParties.push({label:opts.employer||'雇主',type:'employer'});
+  }
+  // 案號解析
+  const casenumber=c.casenumber||'';
+
+  // 第三人 HTML
+  function buildThirdPartyHtml(){
+    if(thirdParties.length===0) return '';
+    return thirdParties.map((tp,i)=>`
+      <tr><td colspan="2" style="padding:2px 0 0;font-weight:600;color:#333;">第${i>0?'　二':'　一'}第三人${thirdParties.length>1?'（'+(i+1)+'）':''}：</td></tr>
+      <tr>
+        <td style="width:130px;vertical-align:top;padding:4px 8px 4px 24px;color:#555;">名稱：</td>
+        <td style="padding:4px 0;">${eb(tp.label,100)}</td>
+      </tr>
+      <tr>
+        <td style="vertical-align:top;padding:4px 8px 4px 24px;color:#555;">設（住）址：</td>
+        <td style="padding:4px 0;">${eb('',150)}</td>
+      </tr>
+      <tr>
+        <td style="vertical-align:top;padding:4px 8px 4px 24px;color:#555;">郵遞區號：</td>
+        <td style="padding:4px 0;">${eb('',60)}</td>
+      </tr>`).join('');
+  }
+
+  // 執行標的 HTML
+  let targetItems=[];
+  let serial=0;
+  const cn=['一','二','三'];
+  if(targets[0]){
+    const n=cn[serial++];
+    targetItems.push(`（${n}）請求查封拍賣債務人所有如附表所示之不動產。`);
+  }
+  if(targets[1]){
+    const n=cn[serial++];
+    const bankName=eb(opts.bank||'',80);
+    const branchName=eb(opts.branch||'',60);
+    targetItems.push(`（${n}）請求扣押債務人存放於第三人${bankName}銀行${branchName}分行之存款及利息所得，准予就債權範圍內予以扣押，以資清償，檢附相關文件，狀請　鈞院鑒核，迅賜裁定准予實施強制執行，以維權益，至感德便。`);
+  }
+  if(targets[2]){
+    const n=cn[serial++];
+    const employerName=eb(opts.employer||'',100);
+    targetItems.push(`（${n}）債務人現服務於第三人${employerName}，每月領有薪資。請在該薪水三分之一的範圍內予以扣押，以資清償，檢附相關文件，狀請　鈞院鑒核，迅賜裁定准予實施強制執行，以維權益，至感德便。`);
+  }
+
+  // 附表（不動產）
+  const attTable=targets[0]?`
+    <div style="margin-top:24px;page-break-inside:avoid;">
+      <div style="font-weight:700;margin-bottom:6px;font-size:14px;">附表：</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <tr style="background:#f7fafc;">
+          <th style="border:1px solid #ccc;padding:4px 6px;">項次</th>
+          <th style="border:1px solid #ccc;padding:4px 6px;">建號</th>
+          <th style="border:1px solid #ccc;padding:4px 6px;">門牌地址</th>
+          <th style="border:1px solid #ccc;padding:4px 6px;">土地坐落</th>
+          <th style="border:1px solid #ccc;padding:4px 6px;">建築樣式</th>
+          <th style="border:1px solid #ccc;padding:4px 6px;">權利範圍</th>
+        </tr>
+        <tr>
+          <td style="border:1px solid #ccc;padding:6px;text-align:center;">1</td>
+          <td style="border:1px solid #ccc;padding:6px;"><span contenteditable="true">&emsp;&emsp;</span></td>
+          <td style="border:1px solid #ccc;padding:6px;"><span contenteditable="true">&emsp;&emsp;&emsp;&emsp;&emsp;</span></td>
+          <td style="border:1px solid #ccc;padding:6px;"><span contenteditable="true">&emsp;&emsp;&emsp;&emsp;&emsp;</span></td>
+          <td style="border:1px solid #ccc;padding:6px;"><span contenteditable="true">&emsp;&emsp;</span></td>
+          <td style="border:1px solid #ccc;padding:6px;"><span contenteditable="true">&emsp;&emsp;</span></td>
+        </tr>
+        <tr>
+          <td style="border:1px solid #ccc;padding:6px;text-align:center;">2</td>
+          <td style="border:1px solid #ccc;padding:6px;"><span contenteditable="true">&emsp;&emsp;</span></td>
+          <td style="border:1px solid #ccc;padding:6px;"><span contenteditable="true">&emsp;&emsp;&emsp;&emsp;&emsp;</span></td>
+          <td style="border:1px solid #ccc;padding:6px;"><span contenteditable="true">&emsp;&emsp;&emsp;&emsp;&emsp;</span></td>
+          <td style="border:1px solid #ccc;padding:6px;"><span contenteditable="true">&emsp;&emsp;</span></td>
+          <td style="border:1px solid #ccc;padding:6px;"><span contenteditable="true">&emsp;&emsp;</span></td>
+        </tr>
+      </table>
+    </div>`:'';
+
+  return `<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>民事聲請強制執行狀</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'標楷體','DFKai-SB','BiauKai',serif;font-size:14px;color:#000;background:#fff;padding:0;}
+  .page{max-width:800px;margin:0 auto;padding:30px 40px 40px;}
+  h1{text-align:center;font-size:22px;font-weight:700;margin-bottom:20px;letter-spacing:4px;}
+  .meta-table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;}
+  .meta-table td{padding:4px 8px 4px 0;vertical-align:top;}
+  .section{margin-bottom:12px;}
+  .section-title{font-weight:700;margin-bottom:6px;}
+  .party-table{width:100%;border-collapse:collapse;margin-bottom:14px;}
+  .party-table td{padding:3px 8px 3px 0;vertical-align:top;}
+  .target-item{margin-bottom:12px;line-height:1.9;text-indent:0;}
+  .signature-row{display:flex;justify-content:space-between;margin-top:24px;font-size:14px;}
+  .no-print{position:fixed;top:12px;right:12px;z-index:99;display:flex;gap:8px;}
+  @media print{.no-print{display:none;} body{padding:0;} .page{padding:20px 30px;}}
+  [contenteditable]{outline:none;border-bottom:1px dashed #999;cursor:text;padding:0 2px;}
+  [contenteditable]:focus{border-bottom-color:#3182ce;background:#ebf8ff;border-radius:2px;}
+</style>
+</head>
+<body>
+<div class="no-print">
+  <button onclick="window.print()" style="padding:8px 18px;background:#3182ce;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;">🖨 列印 / PDF</button>
+  <button onclick="window.close()" style="padding:8px 14px;background:#e2e8f0;border:none;border-radius:6px;font-size:14px;cursor:pointer;">✕ 關閉</button>
+</div>
+
+<div class="page">
+  <h1>民事聲請強制執行狀</h1>
+
+  <table class="meta-table">
+    <tr>
+      <td style="width:180px;">案號：</td>
+      <td>${eb(casenumber,120)}　年度　${eb('',30)}　字第　${eb('',60)}　號</td>
+    </tr>
+    <tr>
+      <td>股別：</td>
+      <td>${eb('',40)}</td>
+    </tr>
+    <tr>
+      <td>訴訟標的金額或價額：</td>
+      <td>新臺幣　${eb(fmtAmt,80)}　元整</td>
+    </tr>
+  </table>
+
+  <table class="party-table">
+    <tr><td colspan="2" style="font-weight:700;padding-bottom:4px;">聲請人（即債權人）：</td></tr>
+    <tr>
+      <td style="width:130px;padding:3px 8px 3px 24px;color:#555;">名稱：</td>
+      <td>${eb(s.creditorName||'',120)}</td>
+    </tr>
+    <tr>
+      <td style="padding:3px 8px 3px 24px;color:#555;">統一編號：</td>
+      <td>${eb(s.creditorId||'',80)}</td>
+    </tr>
+    <tr>
+      <td style="padding:3px 8px 3px 24px;color:#555;">設址：</td>
+      <td>${eb(s.creditorAddress||'',200)}</td>
+    </tr>
+    <tr>
+      <td style="padding:3px 8px 3px 24px;color:#555;">電話：</td>
+      <td>${eb(s.creditorPhone||'',80)}</td>
+    </tr>
+    <tr>
+      <td style="padding:3px 8px 3px 24px;color:#555;">送達地址：</td>
+      <td>${eb(s.creditorAddress||'',200)}</td>
+    </tr>
+    <tr><td colspan="2" style="padding:10px 0 4px;font-weight:700;">相對人（即債務人）：</td></tr>
+    <tr>
+      <td style="padding:3px 8px 3px 24px;color:#555;">姓名：</td>
+      <td>${eb(name,80)}</td>
+    </tr>
+    <tr>
+      <td style="padding:3px 8px 3px 24px;color:#555;">身分證字號：</td>
+      <td>${eb(idno,80)}</td>
+    </tr>
+    <tr>
+      <td style="padding:3px 8px 3px 24px;color:#555;">住址：</td>
+      <td>${eb(addr,200)}</td>
+    </tr>
+    <tr>
+      <td style="padding:3px 8px 3px 24px;color:#555;">郵遞區號：</td>
+      <td>${eb('',50)}</td>
+    </tr>
+    ${buildThirdPartyHtml()}
+  </table>
+
+  <div class="section">
+    <div style="margin-bottom:14px;font-weight:700;">為聲請准許強制執行事：</div>
+
+    <div class="section-title">一、聲請強制執行之內容：</div>
+    <div style="line-height:2;margin-bottom:12px;padding-left:1em;">
+      債務人應給付債權人新臺幣　${eb(fmtAmt,80)}　元，並自民國　${eb('',30)}　年　${eb('',20)}　月　${eb('',20)}　日起至清償日止，按週年利率百分之　${eb('',30)}　計算利息及執行費用，並賠償程序費用新台幣　${eb('',60)}　元整。
+    </div>
+
+    <div class="section-title">二、執行名義：</div>
+    <div style="line-height:2;margin-bottom:12px;padding-left:1em;">
+      法院　${eb('',30)}　年度　${eb('',30)}　字第　${eb('',50)}　號確定判決正本（依實際執行名義記載）。
+    </div>
+
+    <div class="section-title">三、執行標的及方法：</div>
+    <div style="padding-left:1em;">
+      ${targetItems.map(item=>`<div class="target-item" style="line-height:2;margin-bottom:10px;">${item}</div>`).join('')}
+    </div>
+  </div>
+
+  <div class="section" style="margin-top:16px;">
+    <div class="section-title">證物名稱及件數：</div>
+    <div style="padding-left:1em;line-height:2;">
+      <span contenteditable="true">&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;</span>
+    </div>
+  </div>
+
+  <div style="margin-top:28px;text-align:center;font-size:15px;letter-spacing:2px;">
+    此　　致
+  </div>
+  <div style="text-align:center;font-size:15px;margin-top:6px;letter-spacing:1px;">
+    臺灣　${eb(c.court||'',60)}　地方法院民事執行處　公鑒
+  </div>
+
+  <div style="margin-top:28px;display:flex;justify-content:center;gap:80px;font-size:14px;line-height:2.4;">
+    <span>中　華　民　國　${eb(roc.y+'',30)}　年　${eb(roc.m,20)}　月　${eb(roc.day,20)}　日</span>
+  </div>
+
+  <div style="margin-top:20px;text-align:right;line-height:2.4;">
+    <div>具狀人（即債權人）：${eb(s.creditorName||'',100)}</div>
+    <div>撰狀人：${eb(s.creditorName||'',100)}</div>
+  </div>
+
+  ${attTable}
 </div>
 </body>
 </html>`;
