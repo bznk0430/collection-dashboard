@@ -2126,6 +2126,8 @@ function genPromissoryNoteDoc(c,s){
   [contenteditable]{border-bottom:none!important;outline:none!important;}
   .att-table{break-inside:avoid;page-break-inside:avoid;}
   tbody{break-inside:avoid;page-break-inside:avoid;}
+  .pg-spacer{display:none!important;}
+  .pg-sep{display:none!important;}
 }
 *{box-sizing:border-box;}
 body{font-family:'標楷體','DFKai-SB',serif;font-size:13pt;line-height:2;color:#000;background:#c9d4dc;margin:0;}
@@ -2258,6 +2260,40 @@ h1{text-align:center;font-size:18pt;font-weight:bold;letter-spacing:6px;margin:0
     </tfoot>
   </table>
 </div>
+<script>
+(function(){
+  function paginate(){
+    var doc=document.querySelector('.doc');
+    if(!doc)return;
+    var CH=1032,PPV=45,spt=parseInt(getComputedStyle(doc).paddingTop)||50;
+    function printY(el){var dR=doc.getBoundingClientRect(),eR=el.getBoundingClientRect();return(eR.top-dR.top)-spt+PPV;}
+    Array.from(doc.querySelectorAll('tbody:not(.pg-spacer)')).forEach(function(el){
+      var pt=printY(el),eH=el.offsetHeight;
+      if(eH>=CH||eH===0)return;
+      var pe=(Math.floor(pt/CH)+1)*CH;
+      if(pt+eH>pe){
+        var shift=pe-pt,st=document.createElement('tbody');
+        st.className='pg-spacer';
+        var r=document.createElement('tr'),d=document.createElement('td');
+        d.setAttribute('colspan','10');d.style.cssText='height:'+shift+'px;padding:0;border:none;';
+        r.appendChild(d);st.appendChild(r);el.parentNode.insertBefore(st,el);
+      }
+    });
+    doc.style.position='relative';
+    var total=doc.scrollHeight;
+    for(var pg=1;;pg++){
+      var sy=pg*CH-PPV+spt;
+      if(sy>=total-10)break;
+      var s=document.createElement('div');
+      s.className='pg-sep';
+      s.style.cssText='position:absolute;left:0;right:0;top:'+sy+'px;height:14px;background:#c9d4dc;z-index:20;display:flex;align-items:center;justify-content:center;pointer-events:none;';
+      s.innerHTML='<span style="font-size:9px;color:#a0aec0;font-family:sans-serif;">第 '+pg+' 頁</span>';
+      doc.appendChild(s);
+    }
+  }
+  window.addEventListener('load',function(){requestAnimationFrame(function(){requestAnimationFrame(paginate);});});
+})();
+</script>
 </body>
 </html>`;
 }
@@ -2787,6 +2823,8 @@ function genEnforcementDoc(c,s,targets,opts){
     .page{width:794px;margin:0 auto;padding:12mm 20mm;box-shadow:none;}
     tbody{break-inside:avoid;page-break-inside:avoid;}
     .att-table{break-inside:avoid;page-break-inside:avoid;}
+    .pg-spacer{display:none!important;}
+    .pg-sep{display:none!important;}
   }
   [contenteditable]{outline:none;border-bottom:1px dashed #999;cursor:text;padding:0 2px;}
   [contenteditable]:focus{border-bottom-color:#3182ce;background:#ebf8ff;border-radius:2px;}
@@ -2912,6 +2950,40 @@ function genEnforcementDoc(c,s,targets,opts){
 
   ${attTable}
 </div>
+<script>
+(function(){
+  function paginate(){
+    var doc=document.querySelector('.page');
+    if(!doc)return;
+    var CH=1032,PPV=45,spt=parseInt(getComputedStyle(doc).paddingTop)||30;
+    function printY(el){var dR=doc.getBoundingClientRect(),eR=el.getBoundingClientRect();return(eR.top-dR.top)-spt+PPV;}
+    Array.from(doc.querySelectorAll('tbody:not(.pg-spacer)')).forEach(function(el){
+      var pt=printY(el),eH=el.offsetHeight;
+      if(eH>=CH||eH===0)return;
+      var pe=(Math.floor(pt/CH)+1)*CH;
+      if(pt+eH>pe){
+        var shift=pe-pt,st=document.createElement('tbody');
+        st.className='pg-spacer';
+        var r=document.createElement('tr'),d=document.createElement('td');
+        d.setAttribute('colspan','10');d.style.cssText='height:'+shift+'px;padding:0;border:none;';
+        r.appendChild(d);st.appendChild(r);el.parentNode.insertBefore(st,el);
+      }
+    });
+    doc.style.position='relative';
+    var total=doc.scrollHeight;
+    for(var pg=1;;pg++){
+      var sy=pg*CH-PPV+spt;
+      if(sy>=total-10)break;
+      var s=document.createElement('div');
+      s.className='pg-sep';
+      s.style.cssText='position:absolute;left:0;right:0;top:'+sy+'px;height:14px;background:#c9d4dc;z-index:20;display:flex;align-items:center;justify-content:center;pointer-events:none;';
+      s.innerHTML='<span style="font-size:9px;color:#a0aec0;font-family:sans-serif;">第 '+pg+' 頁</span>';
+      doc.appendChild(s);
+    }
+  }
+  window.addEventListener('load',function(){requestAnimationFrame(function(){requestAnimationFrame(paginate);});});
+})();
+</script>
 </body>
 </html>`;
 }
