@@ -2093,13 +2093,14 @@ function genPromissoryNoteDoc(c,s){
     const gbd=rocDate(g.birthday);
     const isPerson=g.type!=='法人';
     return `
-    <tr><td colspan="2" style="height:8px;"></td></tr>
+    <tbody style="break-inside:avoid;page-break-inside:avoid;">
+    <tr><td colspan="2" style="padding-top:10px;border-top:1px dashed #ccc;"></td></tr>
     <tr>
-      <td style="padding:3px 6px;vertical-align:top;white-space:nowrap;width:200px;">
-        相對人${i+2}　${g.name}<br>
-        <span style="font-size:10pt;color:#555;">（即債務人）</span>
+      <td style="padding:4px 8px 4px 0;vertical-align:top;white-space:nowrap;width:200px;font-weight:bold;">
+        相對人：　${g.name}<br>
+        <span style="font-size:10pt;color:#555;font-weight:normal;">（即債務人）</span>
       </td>
-      <td style="padding:3px 6px;vertical-align:top;">
+      <td style="padding:4px 8px 4px 0;vertical-align:top;line-height:1.9;">
         身分證明文件：${g.type==='法人'?'☑ 營利事業登記':'☑ 國民身分證'}<br>
         證號：${g.idno||eb('',80)}<br>
         ${isPerson?`性別：${eb('',32)}<br>
@@ -2107,7 +2108,8 @@ function genPromissoryNoteDoc(c,s){
         ${g.type==='法人'?'公司地址':'戶籍地'}：${g.domicile?g.domicile:eb('',200)}<br>
         電話：${g.phone?g.phone:eb('',120)}
       </td>
-    </tr>`;
+    </tr>
+    </tbody>`;
   }).join('');
 
   return `<!DOCTYPE html>
@@ -2166,12 +2168,13 @@ h1{text-align:center;font-size:18pt;font-weight:bold;letter-spacing:6px;margin:0
   <div style="margin-bottom:12px;">訴訟標的金額或價額：新臺幣 <strong>${fmtMoney(c.noteAmount||c.amount)}</strong> 元</div>
 
   <table class="party-tbl">
+    <tbody style="break-inside:avoid;page-break-inside:avoid;">
     <tr>
-      <td style="width:200px;vertical-align:top;white-space:nowrap;">
-        聲請人　${s.creditorName}<br>
-        <span style="font-size:10pt;color:#555;">（即債權人）</span>
+      <td style="width:200px;vertical-align:top;white-space:nowrap;padding:4px 8px 4px 0;font-weight:bold;">
+        聲請人：　${s.creditorName}<br>
+        <span style="font-size:10pt;color:#555;font-weight:normal;">（即債權人）</span>
       </td>
-      <td style="vertical-align:top;">
+      <td style="vertical-align:top;padding:4px 8px 4px 0;line-height:1.9;">
         身分證明文件：☑ 營利事業登記<br>
         證號：${s.creditorId||'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'}<br>
         法定代理人：${s.legalRep||'&nbsp;&nbsp;&nbsp;&nbsp;'}<br>
@@ -2181,13 +2184,15 @@ h1{text-align:center;font-size:18pt;font-weight:bold;letter-spacing:6px;margin:0
         送達處所：${s.agentAddr||'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'}
       </td>
     </tr>
-    <tr><td colspan="2" style="height:10px;"></td></tr>
+    </tbody>
+    <tbody style="break-inside:avoid;page-break-inside:avoid;">
+    <tr><td colspan="2" style="padding-top:10px;border-top:1px dashed #ccc;"></td></tr>
     <tr>
-      <td style="width:200px;vertical-align:top;white-space:nowrap;">
-        相對人1　${c.name}<br>
-        <span style="font-size:10pt;color:#555;">（即債務人）</span>
+      <td style="width:200px;vertical-align:top;white-space:nowrap;padding:4px 8px 4px 0;font-weight:bold;">
+        相對人：　${c.name}<br>
+        <span style="font-size:10pt;color:#555;font-weight:normal;">（即債務人）</span>
       </td>
-      <td style="vertical-align:top;">
+      <td style="vertical-align:top;padding:4px 8px 4px 0;line-height:1.9;">
         身分證明文件：${idType}<br>
         證號：${c.idno||eb('',80)}<br>
         ${c.borrowerType!=='法人'?`性別：${eb('',32)}<br>
@@ -2197,6 +2202,7 @@ h1{text-align:center;font-size:18pt;font-weight:bold;letter-spacing:6px;margin:0
         電話：${c.bphone||eb('',120)}
       </td>
     </tr>
+    </tbody>
     ${guarantorRows}
   </table>
 
@@ -2664,13 +2670,13 @@ function genEnforcementDoc(c,s,targets,opts){
 
   function buildThirdPartyHtml(){
     if(thirdParties.length===0) return '';
-    const cnNum=['一','二','三','四','五','六','七','八','九','十'];
     return thirdParties.map((tp,i)=>`
-      <tr><td colspan="2" style="padding:6px 0 2px;font-weight:600;color:#333;">
+      <tbody style="break-inside:avoid;page-break-inside:avoid;">
+      <tr><td colspan="2" style="padding:${i===0?'10px':'14px'} 0 4px;font-weight:700;${i>0?'border-top:1px dashed #ccc;':''}color:#1a202c;">
         第三人：
       </td></tr>
       <tr>
-        <td style="width:130px;vertical-align:top;padding:3px 8px 3px 24px;color:#555;">名稱：</td>
+        <td style="width:140px;vertical-align:top;padding:3px 8px 3px 24px;color:#555;">名稱：</td>
         <td style="padding:3px 0;">${eb(tp.label||'',120)}</td>
       </tr>
       <tr>
@@ -2680,7 +2686,8 @@ function genEnforcementDoc(c,s,targets,opts){
       <tr>
         <td style="vertical-align:top;padding:3px 8px 3px 24px;color:#555;">郵遞區號：</td>
         <td style="padding:3px 0;">${eb('',60)}</td>
-      </tr>`).join('');
+      </tr>
+      </tbody>`).join('');
   }
 
   // 執行標的 HTML
@@ -2834,28 +2841,28 @@ function genEnforcementDoc(c,s,targets,opts){
       const persons=opts.selectedDebtors&&opts.selectedDebtors.length>0
         ?opts.selectedDebtors
         :[{name,idno,addr,borrowerType:c.borrowerType||'自然人',role:'借款人'}];
-      const multi=persons.length>1;
-      const cnNum=['一','二','三','四','五','六','七','八','九','十'];
       return persons.map((p,i)=>`
-        <tr><td colspan="2" style="padding:${i>0?'14px':'10px'} 0 4px;font-weight:700;border-top:${i>0?'1px dashed #e2e8f0':''};color:#333;">
+        <tbody style="break-inside:avoid;page-break-inside:avoid;">
+        <tr><td colspan="2" style="padding:${i===0?'10px':'14px'} 0 4px;font-weight:700;${i>0?'border-top:1px dashed #ccc;':''}color:#1a202c;">
           相對人（即債務人）：
         </td></tr>
         <tr>
-          <td style="width:130px;padding:3px 8px 3px 24px;color:#555;">${p.borrowerType==='法人'?'公司名稱：':'姓名：'}</td>
-          <td>${eb(p.name,80)}</td>
+          <td style="width:140px;padding:3px 8px 3px 24px;color:#555;">${p.borrowerType==='法人'?'公司名稱：':'姓名：'}</td>
+          <td style="padding:3px 0;">${eb(p.name,80)}</td>
         </tr>
         <tr>
           <td style="padding:3px 8px 3px 24px;color:#555;">${p.borrowerType==='法人'?'統一編號：':'身分證字號：'}</td>
-          <td>${eb(p.idno||'',80)}</td>
+          <td style="padding:3px 0;">${eb(p.idno||'',80)}</td>
         </tr>
         <tr>
           <td style="padding:3px 8px 3px 24px;color:#555;">${p.borrowerType==='法人'?'設址：':'住址：'}</td>
-          <td>${eb(p.addr||'',200)}</td>
+          <td style="padding:3px 0;">${eb(p.addr||'',200)}</td>
         </tr>
         <tr>
           <td style="padding:3px 8px 3px 24px;color:#555;">郵遞區號：</td>
-          <td>${eb('',50)}</td>
-        </tr>`).join('');
+          <td style="padding:3px 0;">${eb('',50)}</td>
+        </tr>
+        </tbody>`).join('');
     })()}
     ${buildThirdPartyHtml()}
   </table>
