@@ -2466,16 +2466,43 @@ body{font-family:'標楷體','DFKai-SB',serif;font-size:10pt;background:#e2e8f0;
 // ── 強制執行狀 — 執行標的選擇 UI ─────────────────
 let _enforcementCaseId=null;
 let _enforcementDebtors=[];
+let _enforcementAllPersons=[];  // [{role,name,idno,addr,idx}]
 
 function openEnforcementOptions(caseId){
   _enforcementCaseId=caseId;
   const c=loadCases().find(x=>x.id===caseId);
-  _enforcementDebtors=[c.name||'借款人'];
+  // 建立所有可選人員清單
+  _enforcementAllPersons=[];
+  const bAddr=c.residence&&!c.sameResidence?c.residence:(c.domicile||'');
+  _enforcementAllPersons.push({role:'借款人',name:c.name||'',idno:c.idno||'',addr:bAddr,borrowerType:c.borrowerType||'自然人',idx:0});
   if(c.guarantors&&c.guarantors.length){
-    c.guarantors.forEach(g=>{ if(g.name) _enforcementDebtors.push(g.name); });
+    c.guarantors.forEach((g,i)=>{
+      if(!g.name) return;
+      const gAddr=g.residence&&!g.sameResidence?g.residence:(g.domicile||'');
+      _enforcementAllPersons.push({role:'連帶保證人',name:g.name,idno:g.idno||'',addr:gAddr,borrowerType:g.borrowerType||'自然人',idx:i+1});
+    });
   }
+  _enforcementDebtors=_enforcementAllPersons.map(p=>p.name).filter(Boolean);
+
+  const personRows=_enforcementAllPersons.map((p,i)=>`
+    <label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;cursor:pointer;background:${i%2===0?'#f7fafc':'#fff'};">
+      <input type="checkbox" class="enf-person-chk" data-idx="${i}"
+        style="width:16px;height:16px;flex-shrink:0;" ${i===0?'checked':''}>
+      <div style="display:flex;gap:8px;align-items:center;flex:1;min-width:0;">
+        <span style="font-size:11px;background:${p.role==='借款人'?'#ebf8ff':'#faf5ff'};color:${p.role==='借款人'?'#2b6cb0':'#6b21a8'};padding:1px 7px;border-radius:10px;white-space:nowrap;">${p.role}</span>
+        <span style="font-weight:600;font-size:13px;">${p.name}</span>
+        ${p.idno?`<span style="font-size:12px;color:#718096;">${p.idno}</span>`:''}
+      </div>
+    </label>`).join('');
+
   document.getElementById('enforcement-options-body').innerHTML=`
     <div style="display:flex;flex-direction:column;gap:14px;">
+      <!-- 相對人選擇 -->
+      <div style="border:2px solid #4299e1;border-radius:8px;padding:12px;">
+        <div style="font-weight:700;font-size:13px;color:#2b6cb0;margin-bottom:8px;">📋 相對人（即債務人）— 選擇列入對象</div>
+        <div style="display:flex;flex-direction:column;gap:2px;">${personRows}</div>
+      </div>
+      <!-- 執行標的 -->
       <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;">
         <input type="checkbox" id="enf-t1" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;">
         <div>
@@ -2565,6 +2592,13 @@ function addEmployerRow(debtor,employer){
 
 function submitEnforcementDoc(){
   if(!_enforcementCaseId) return;
+  // 收集選取的相對人
+  const selectedDebtors=[];
+  document.querySelectorAll('.enf-person-chk:checked').forEach(chk=>{
+    const idx=parseInt(chk.dataset.idx);
+    if(_enforcementAllPersons[idx]) selectedDebtors.push(_enforcementAllPersons[idx]);
+  });
+  if(selectedDebtors.length===0){ alert('請至少選取一位相對人'); return; }
   const t1=document.getElementById('enf-t1').checked;
   const t2=document.getElementById('enf-t2').checked;
   const t3=document.getElementById('enf-t3').checked;
@@ -2588,7 +2622,7 @@ function submitEnforcementDoc(){
       employers.push({debtor,employer});
     });
   }
-  const opts={banks,employers};
+  const opts={banks,employers,selectedDebtors};
   const c=loadCases().find(x=>x.id===_enforcementCaseId);
   const s=loadSettings();
   const html=genEnforcementDoc(c,s,[t1,t2,t3],opts);
@@ -2627,7 +2661,7 @@ function genEnforcementDoc(c,s,targets,opts){
     const cnNum=['一','二','三','四','五','六','七','八','九','十'];
     return thirdParties.map((tp,i)=>`
       <tr><td colspan="2" style="padding:6px 0 2px;font-weight:600;color:#333;">
-        第${cnNum[i]||i+1}第三人：${tp.debtor?`<span style="font-size:12px;color:#718096;font-weight:400;">（對應債務人：${tp.debtor}）</span>`:''}
+        第三人：${tp.debtor?`<span style="font-size:12px;color:#718096;font-weight:400;">（對應債務人：${tp.debtor}）</span>`:''}
       </td></tr>
       <tr>
         <td style="width:130px;vertical-align:top;padding:3px 8px 3px 24px;color:#555;">名稱：</td>
@@ -2784,23 +2818,34 @@ function genEnforcementDoc(c,s,targets,opts){
       <td style="padding:3px 8px 3px 24px;color:#555;">送達地址：</td>
       <td>${eb(s.creditorAddress||'',200)}</td>
     </tr>
-    <tr><td colspan="2" style="padding:10px 0 4px;font-weight:700;">相對人（即債務人）：</td></tr>
-    <tr>
-      <td style="padding:3px 8px 3px 24px;color:#555;">姓名：</td>
-      <td>${eb(name,80)}</td>
-    </tr>
-    <tr>
-      <td style="padding:3px 8px 3px 24px;color:#555;">身分證字號：</td>
-      <td>${eb(idno,80)}</td>
-    </tr>
-    <tr>
-      <td style="padding:3px 8px 3px 24px;color:#555;">住址：</td>
-      <td>${eb(addr,200)}</td>
-    </tr>
-    <tr>
-      <td style="padding:3px 8px 3px 24px;color:#555;">郵遞區號：</td>
-      <td>${eb('',50)}</td>
-    </tr>
+    ${(()=>{
+      const persons=opts.selectedDebtors&&opts.selectedDebtors.length>0
+        ?opts.selectedDebtors
+        :[{name,idno,addr,borrowerType:c.borrowerType||'自然人',role:'借款人'}];
+      const multi=persons.length>1;
+      const cnNum=['一','二','三','四','五','六','七','八','九','十'];
+      return persons.map((p,i)=>`
+        <tr><td colspan="2" style="padding:${i>0?'14px':'10px'} 0 4px;font-weight:700;border-top:${i>0?'1px dashed #e2e8f0':''};color:#333;">
+          相對人（即債務人）${multi?cnNum[i]||i+1:''}：
+          <span style="font-size:11px;font-weight:400;color:#718096;margin-left:8px;">${p.role||''}</span>
+        </td></tr>
+        <tr>
+          <td style="width:130px;padding:3px 8px 3px 24px;color:#555;">${p.borrowerType==='法人'?'公司名稱：':'姓名：'}</td>
+          <td>${eb(p.name,80)}</td>
+        </tr>
+        <tr>
+          <td style="padding:3px 8px 3px 24px;color:#555;">${p.borrowerType==='法人'?'統一編號：':'身分證字號：'}</td>
+          <td>${eb(p.idno||'',80)}</td>
+        </tr>
+        <tr>
+          <td style="padding:3px 8px 3px 24px;color:#555;">${p.borrowerType==='法人'?'設址：':'住址：'}</td>
+          <td>${eb(p.addr||'',200)}</td>
+        </tr>
+        <tr>
+          <td style="padding:3px 8px 3px 24px;color:#555;">郵遞區號：</td>
+          <td>${eb('',50)}</td>
+        </tr>`).join('');
+    })()}
     ${buildThirdPartyHtml()}
   </table>
 
