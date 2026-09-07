@@ -2009,7 +2009,7 @@ function saveSettingsForm(){
 const DOC_TEMPLATES=[
   {key:'promissory_note',label:'聲請裁定本票強制執行狀',stages:['本票裁定'],fn:'genPromissoryNoteDoc'},
   {key:'certified_letter',label:'存證信函',stages:['存證信函'],fn:'genCertifiedLetterDoc'},
-  {key:'enforcement',label:'民事聲請強制執行狀',stages:['強制執行'],fn:'genEnforcementDoc'},
+  {key:'enforcement',label:'民事聲請強制執行狀',stages:['強制執行','債權憑證'],fn:'genEnforcementDoc'},
 ];
 
 function openDocChooser(caseId){
@@ -2116,10 +2116,11 @@ function genPromissoryNoteDoc(c,s){
 <meta charset="UTF-8">
 <title>聲請裁定本票強制執行狀 - ${c.name}</title>
 <style>
-@page{size:A4;margin:2cm 2.5cm;}
+@page{size:A4;margin:0;}
 @media print{
   .toolbar{display:none!important;}
   body{background:white;margin:0;}
+  .doc{margin:0 auto;padding:20mm 25mm;box-shadow:none;}
   [contenteditable]{border-bottom:none!important;outline:none!important;}
 }
 *{box-sizing:border-box;}
@@ -2347,10 +2348,11 @@ function genCertifiedLetterDoc(c,s){
 <meta charset="UTF-8">
 <title>存證信函 - ${c.name}</title>
 <style>
-@page{size:A4;margin:0.8cm 1.2cm;}
+@page{size:A4;margin:0;}
 @media print{
   .toolbar{display:none!important;}
   body{background:white;margin:0;}
+  .pg{margin:0 auto;box-shadow:none;}
   .gc:focus{outline:none;}
   .bc{background:#fffde7!important;}
 }
@@ -2767,7 +2769,8 @@ function genEnforcementDoc(c,s,targets,opts){
   .target-item{margin-bottom:12px;line-height:1.9;text-indent:0;}
   .signature-row{display:flex;justify-content:space-between;margin-top:24px;font-size:14px;}
   .no-print{position:fixed;top:12px;right:12px;z-index:99;display:flex;gap:8px;}
-  @media print{.no-print{display:none;} body{padding:0;} .page{padding:20px 30px;}}
+  @page{margin:0;}
+  @media print{.no-print{display:none;} body{padding:0;} .page{padding:18mm 22mm;}}
   [contenteditable]{outline:none;border-bottom:1px dashed #999;cursor:text;padding:0 2px;}
   [contenteditable]:focus{border-bottom-color:#3182ce;background:#ebf8ff;border-radius:2px;}
 </style>
