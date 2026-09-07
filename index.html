@@ -2661,7 +2661,7 @@ function genEnforcementDoc(c,s,targets,opts){
     const cnNum=['一','二','三','四','五','六','七','八','九','十'];
     return thirdParties.map((tp,i)=>`
       <tr><td colspan="2" style="padding:6px 0 2px;font-weight:600;color:#333;">
-        第三人：${tp.debtor?`<span style="font-size:12px;color:#718096;font-weight:400;">（對應債務人：${tp.debtor}）</span>`:''}
+        第三人：
       </td></tr>
       <tr>
         <td style="width:130px;vertical-align:top;padding:3px 8px 3px 24px;color:#555;">名稱：</td>
@@ -2826,8 +2826,7 @@ function genEnforcementDoc(c,s,targets,opts){
       const cnNum=['一','二','三','四','五','六','七','八','九','十'];
       return persons.map((p,i)=>`
         <tr><td colspan="2" style="padding:${i>0?'14px':'10px'} 0 4px;font-weight:700;border-top:${i>0?'1px dashed #e2e8f0':''};color:#333;">
-          相對人（即債務人）${multi?cnNum[i]||i+1:''}：
-          <span style="font-size:11px;font-weight:400;color:#718096;margin-left:8px;">${p.role||''}</span>
+          相對人（即債務人）：
         </td></tr>
         <tr>
           <td style="width:130px;padding:3px 8px 3px 24px;color:#555;">${p.borrowerType==='法人'?'公司名稱：':'姓名：'}</td>
