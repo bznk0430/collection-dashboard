@@ -2121,11 +2121,11 @@ function genPromissoryNoteDoc(c,s){
 @page{size:A4;margin:0mm;}
 @media print{
   .toolbar{display:none!important;}
-  body{background:white;margin:0;padding:0;}
-  .doc{width:794px;margin:0 auto;padding:20mm 25mm;box-shadow:none;}
+  body{background:white;margin:0;padding:0;line-height:1.75;}
+  .doc{width:794px;margin:0 auto;padding:12mm 20mm;box-shadow:none;}
   [contenteditable]{border-bottom:none!important;outline:none!important;}
-  table,tr,td,th{break-inside:avoid;page-break-inside:avoid;}
   .att-table{break-inside:avoid;page-break-inside:avoid;}
+  tbody{break-inside:avoid;page-break-inside:avoid;}
 }
 *{box-sizing:border-box;}
 body{font-family:'標楷體','DFKai-SB',serif;font-size:13pt;line-height:2;color:#000;background:#c9d4dc;margin:0;}
@@ -2783,9 +2783,10 @@ function genEnforcementDoc(c,s,targets,opts){
   @page{size:A4;margin:0mm;}
   @media print{
     .no-print{display:none;}
-    body{background:white;padding:0;}
-    .page{width:794px;margin:0 auto;padding:18mm 22mm;box-shadow:none;}
-    table{break-inside:avoid;page-break-inside:avoid;}
+    body{background:white;padding:0;line-height:1.75;}
+    .page{width:794px;margin:0 auto;padding:12mm 20mm;box-shadow:none;}
+    tbody{break-inside:avoid;page-break-inside:avoid;}
+    .att-table{break-inside:avoid;page-break-inside:avoid;}
   }
   [contenteditable]{outline:none;border-bottom:1px dashed #999;cursor:text;padding:0 2px;}
   [contenteditable]:focus{border-bottom-color:#3182ce;background:#ebf8ff;border-radius:2px;}
