@@ -2055,9 +2055,9 @@ function generateDoc(caseId,templateKey){
     return;
   }
   const html=window[t.fn](c,s);
-  const w=window.open('','_blank','width=900,height=800');
-  w.document.write(html);
-  w.document.close();
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  window.open(url,'_blank','width=900,height=800');
   closeModal('doc-chooser-modal');
 }
 
@@ -2116,7 +2116,7 @@ function genPromissoryNoteDoc(c,s){
 <meta charset="UTF-8">
 <title>聲請裁定本票強制執行狀 - ${c.name}</title>
 <style>
-@page{size:A4;margin:0;}
+@page{margin:0mm;}
 @media print{
   .toolbar{display:none!important;}
   body{background:white;margin:0;}
@@ -2348,7 +2348,7 @@ function genCertifiedLetterDoc(c,s){
 <meta charset="UTF-8">
 <title>存證信函 - ${c.name}</title>
 <style>
-@page{size:A4;margin:0;}
+@page{margin:0mm;}
 @media print{
   .toolbar{display:none!important;}
   body{background:white;margin:0;}
@@ -2628,9 +2628,9 @@ function submitEnforcementDoc(){
   const c=loadCases().find(x=>x.id===_enforcementCaseId);
   const s=loadSettings();
   const html=genEnforcementDoc(c,s,[t1,t2,t3],opts);
-  const w=window.open('','_blank','width=900,height=800');
-  w.document.write(html);
-  w.document.close();
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  window.open(url,'_blank','width=900,height=800');
   closeModal('enforcement-options-modal');
 }
 
