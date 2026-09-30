@@ -440,7 +440,7 @@
         </div>
 
         <h4 style="font-size:13px;font-weight:700;margin-bottom:8px;color:#2d3748;">資料儲存與備份</h4>
-        <p style="font-size:13px;">標題下方會顯示目前的資料模式：「💻 本機資料」存在這台電腦的瀏覽器，每個人各自一份；「☁ 共用資料庫」存在公司的 Firebase 資料庫，所有 @bznk.com 同事看到同一份，任何人更新，其他人的畫面會自動更新。網址加 ?cloud=1 改用共用資料庫（會記住），加 ?cloud=0 切回本機資料。登入後資料有變更時會自動備份到 Google Drive；也可以隨時按「☁ 立即備份」（未授權時會跳出 Google 視窗），標題下方會顯示上次備份時間。備份檔名帶有帳號，只會取代自己之前的備份，不會刪到同事的檔案。另可點擊「匯出 Excel」下載一份，匯出檔案包含案件清單、費用與收款明細、費用沖銷明細、本金催回明細、強制執行明細、年度調閱記錄等區塊。</p>
+        <p style="font-size:13px;">標題下方會顯示目前的資料模式：「💻 本機資料」存在這台電腦的瀏覽器，每個人各自一份；「☁ 共用資料庫」存在公司的 Firebase 資料庫，所有 @bznk.com 同事看到同一份，任何人更新，其他人的畫面會自動更新。系統預設使用共用資料庫；網址加 ?cloud=0 可切回本機資料（會記住），加 ?cloud=1 恢復共用資料庫。登入後資料有變更時會自動備份到 Google Drive；也可以隨時按「☁ 立即備份」（未授權時會跳出 Google 視窗），標題下方會顯示上次備份時間。備份檔名帶有帳號，只會取代自己之前的備份，不會刪到同事的檔案。另可點擊「匯出 Excel」下載一份，匯出檔案包含案件清單、費用與收款明細、費用沖銷明細、本金催回明細、強制執行明細、年度調閱記錄等區塊。</p>
       </div>
     </div>
   </div>
@@ -849,11 +849,11 @@ const OFFSETS_KEY    = 'bznk_offsets_v1';
 const ENFORCE_KEY    = 'bznk_enforcements_v1';
 
 // ── 資料存取：本機（localStorage）或共用資料庫（Firestore）──────────
-// 網址加 ?cloud=1 啟用共用資料庫（會記住），?cloud=0 切回本機資料
+// 預設使用共用資料庫；網址加 ?cloud=0 切回本機資料（會記住），?cloud=1 恢復共用資料庫
 (function(){ try{ const p=new URLSearchParams(location.search).get('cloud');
   if(p==='1') localStorage.setItem('bznk_cloud_mode','1');
-  if(p==='0') localStorage.removeItem('bznk_cloud_mode'); }catch(e){} })();
-const CLOUD_MODE = (()=>{ try{ return localStorage.getItem('bznk_cloud_mode')==='1'; }catch(e){ return false; } })();
+  if(p==='0') localStorage.setItem('bznk_cloud_mode','0'); }catch(e){} })();
+const CLOUD_MODE = (()=>{ try{ return localStorage.getItem('bznk_cloud_mode')!=='0'; }catch(e){ return true; } })();
 const STORES = { cases:CASES_KEY, fees:FEES_KEY, reviews:REVIEWS_KEY, recoveries:RECOVERIES_KEY, offsets:OFFSETS_KEY, enforcements:ENFORCE_KEY };
 const _cloud = { ready:false, data:{ cases:[], fees:[], reviews:[], recoveries:[], offsets:[], enforcements:[], settings:{} } };
 function localLoad(key, def) { try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(def)); } catch(e) { return def; } }
@@ -938,12 +938,12 @@ async function maybeMigrateLocalToCloud() {
   }
   const st = localLoad(SETTINGS_KEY, {});
   if (Object.keys(st).length) saveSettingsFn(st);
-  alert('已上傳到共用資料庫，其他同事用 ?cloud=1 登入後就會看到相同資料。');
+  alert('已上傳到共用資料庫，其他同事登入後就會看到相同資料。');
 }
 function renderDataMode() {
   const el=document.getElementById('data-mode'); if(!el) return;
   el.textContent = CLOUD_MODE ? '☁ 共用資料庫' : '💻 本機資料';
-  el.title = CLOUD_MODE ? '資料存在共用資料庫，所有同事看到同一份（網址加 ?cloud=0 切回本機資料）' : '資料只存在這台電腦的瀏覽器（網址加 ?cloud=1 改用共用資料庫）';
+  el.title = CLOUD_MODE ? '資料存在共用資料庫，所有同事看到同一份（網址加 ?cloud=0 切回本機資料）' : '資料只存在這台電腦的瀏覽器（網址加 ?cloud=1 恢復共用資料庫）';
 }
 
 function loadCases()        { return storeLoad('cases'); }
