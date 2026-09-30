@@ -209,6 +209,29 @@
   .user-chip .logout-btn { background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 10px; padding: 2px 8px; font-size: 11px; cursor: pointer; margin-left: 4px; }
   .user-chip .logout-btn:hover { background: rgba(255,255,255,0.35); }
 
+  .enf-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
+  @media (max-width:760px) { .enf-grid { grid-template-columns:1fr; } }
+  .enf-panel { border:1px solid #e2e8f0; border-radius:10px; padding:12px; }
+  .enf-panel.re { background:#fffaf0; } .enf-panel.mv { background:#f0f9ff; }
+  .enf-head { display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:8px; font-weight:700; font-size:13px; }
+  .enf-state { font-size:11px; padding:2px 8px; border-radius:10px; font-weight:600; margin-left:4px; }
+  .enf-state.none { background:#edf2f7; color:#718096; } .enf-state.active { background:#fee2e2; color:#991b1b; } .enf-state.done { background:#d1fae5; color:#065f46; }
+  .enf-item { background:white; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; margin-bottom:8px; font-size:12px; }
+  .enf-item.closed { opacity:0.7; }
+  .enf-target { font-weight:700; font-size:13px; color:#1a202c; }
+  .enf-meta { color:#718096; margin:2px 0; }
+  .enf-status { display:inline-block; background:#ebf8ff; color:#2b6cb0; padding:1px 8px; border-radius:10px; font-weight:600; }
+  .enf-status.closed { background:#edf2f7; color:#4a5568; }
+  .enf-next { color:#c05621; font-weight:600; margin-top:4px; } .enf-next.overdue { color:#c53030; }
+  .enf-log { margin:4px 0 0; padding-left:0; list-style:none; border-left:2px solid #e2e8f0; }
+  .enf-log li { padding:1px 0 1px 8px; color:#4a5568; }
+  .enf-log b { color:#2d3748; font-weight:600; margin-right:6px; }
+  .enf-chip { display:inline-block; font-size:10px; margin-top:3px; margin-right:4px; padding:1px 6px; border-radius:8px; }
+  .enf-chip.none { display:none; } .enf-chip.active { background:#fee2e2; color:#991b1b; } .enf-chip.done { background:#d1fae5; color:#065f46; }
+  .upcoming { background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px 14px; margin-bottom:12px; }
+  .upcoming-row { display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; padding:4px 0; border-top:1px dashed #fde68a; font-size:13px; cursor:pointer; }
+  .upcoming-row:hover { background:#fef3c7; }
+  .upcoming-date { font-weight:700; color:#c05621; min-width:92px; } .upcoming-row.overdue .upcoming-date { color:#c53030; }
   @media print { .btn, .header-actions, .filter-bar, .tab-bar { display: none; } }
 </style>
 </head>
@@ -269,6 +292,7 @@
 
     <!-- 案件清單 -->
     <div class="tab-content active" id="tab-cases">
+      <div id="upcoming-panel"></div>
       <div class="filter-bar">
         <input type="text" id="search-input" placeholder="🔍 搜尋借款人姓名、案件編號..." oninput="renderTable()" style="min-width:220px;">
         <select id="filter-stage" onchange="renderTable()">
@@ -386,6 +410,17 @@
           <p style="margin-top:8px;">若決定聲請再執行，可同步在費用頁籤記錄再執行的代墊費用。</p>
         </div>
 
+        <h4 style="font-size:13px;font-weight:700;margin-bottom:8px;color:#2d3748;">⚖️ 強制執行明細（不動產／動產）</h4>
+        <div style="background:#f7fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;margin-bottom:20px;font-size:13px;">
+          <p style="margin-bottom:8px;">在案件「詳情」的<strong>強制執行明細</strong>區塊，分成 🏠 不動產、💰 動產（存款、保險、薪資、應收帳款等）兩邊記錄，每一筆標的各自記錄：</p>
+          <p>・ 標的、債務人、執行法院、執行案號</p>
+          <p>・ 目前進度（例如查封、第1次拍賣、第三人陳報－無款、終結－已受償）與受償金額</p>
+          <p>・ 期日／待辦（拍賣日、詢價期日、補正期限等，可以有好幾個）：30 天內與已過期未完成的會顯示在案件清單上方的「近期期日」</p>
+          <p>・ 處理完按「✔ 完成」：填完成日期、辦理單位（本公司或委外單位）與狀況備註，沒有文件也能留下紀錄</p>
+          <p>・ 進度紀錄：每次更新可加一筆「日期＋內容」，進度有變時也會自動記錄</p>
+          <p style="margin-top:8px;">兩邊互不影響：可以同時進行，也可以一邊已終結、另一邊還在執行。進度選「終結」或「撤回」的標的視為結束。</p>
+        </div>
+
         <h4 style="font-size:13px;font-weight:700;margin-bottom:8px;color:#2d3748;">強制執行結束的兩種結果</h4>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
           <div style="background:#f0fff4;border:1px solid #c6f6d5;border-radius:8px;padding:12px 14px;font-size:13px;">
@@ -399,7 +434,7 @@
         </div>
 
         <h4 style="font-size:13px;font-weight:700;margin-bottom:8px;color:#2d3748;">資料儲存與備份</h4>
-        <p style="font-size:13px;">資料存於瀏覽器本地端。建議定期點擊「匯出 Excel」備份，匯出檔案包含案件清單、費用明細、收款記錄、年度調閱記錄四個區塊。</p>
+        <p style="font-size:13px;">資料存於瀏覽器本地端。建議定期點擊「匯出 Excel」備份，匯出檔案包含案件清單、費用與收款明細、費用沖銷明細、本金催回明細、強制執行明細、年度調閱記錄等區塊。</p>
       </div>
     </div>
   </div>
@@ -563,6 +598,68 @@
   <div class="modal" style="width:740px;">
     <div class="modal-title"><span id="detail-title">案件詳情</span><button class="modal-close" onclick="closeModal('detail-modal')">✕</button></div>
     <div id="detail-content"></div>
+  </div>
+</div>
+
+<!-- 強制執行標的 Modal -->
+<div class="modal-overlay" id="enf-modal">
+  <div class="modal" style="width:580px;">
+    <div class="modal-title"><span id="enf-modal-title">執行標的</span><button class="modal-close" onclick="closeEnfModal()">✕</button></div>
+    <input type="hidden" id="enf-id" /><input type="hidden" id="enf-case" /><input type="hidden" id="enf-track" />
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">標的類別</label><select class="form-control" id="enf-kind"></select></div>
+      <div class="form-group"><label class="form-label">債務人</label><select class="form-control" id="enf-debtor"></select></div>
+    </div>
+    <div class="form-group"><label class="form-label">標的說明</label><input class="form-control" id="enf-target" /></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">執行法院</label><input class="form-control" id="enf-court" placeholder="例：臺灣臺南地方法院" /></div>
+      <div class="form-group"><label class="form-label">執行案號</label><input class="form-control" id="enf-casenumber" placeholder="例：115年度司執助字第1974號（當股）" /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">目前進度</label><select class="form-control" id="enf-status"></select></div>
+      <div class="form-group"><label class="form-label">受償金額（元）</label><input class="form-control" type="number" id="enf-recovered" placeholder="0（有領到款項才填）" /></div>
+    </div>
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 14px;margin-bottom:12px;">
+      <div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:8px;">新增期日／待辦（拍賣日、詢價期日、補正期限等；可以有好幾個）</div>
+      <div class="form-row" style="margin-bottom:0;">
+        <div class="form-group" style="flex:0 0 150px;margin-bottom:0;"><input class="form-control" type="date" id="enf-dl-date" /></div>
+        <div class="form-group" style="margin-bottom:0;"><input class="form-control" id="enf-dl-note" placeholder="例：補正執行費、第1次拍賣、詢價期日" /></div>
+      </div>
+      <div id="enf-dl-list" style="display:none;margin-top:10px;"></div>
+    </div>
+    <div style="background:#f7fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;">
+      <div style="font-size:12px;font-weight:700;color:#4a5568;margin-bottom:8px;">新增進度紀錄（選填；進度有變但沒填時會自動記一筆）</div>
+      <div class="form-row" style="margin-bottom:0;">
+        <div class="form-group" style="flex:0 0 150px;margin-bottom:0;"><input class="form-control" type="date" id="enf-log-date" /></div>
+        <div class="form-group" style="margin-bottom:0;"><input class="form-control" id="enf-log-text" placeholder="例：法院回覆存款餘額 0 元、鑑價 1,947 萬" /></div>
+      </div>
+      <div id="enf-log-list" style="display:none;margin-top:10px;"></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px;">
+      <button class="btn btn-outline" onclick="closeEnfModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveEnforcement()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 期日／待辦完成 Modal -->
+<div class="modal-overlay" id="done-modal">
+  <div class="modal" style="width:480px;">
+    <div class="modal-title"><span>✔ 標記完成</span><button class="modal-close" onclick="closeDoneModal()">✕</button></div>
+    <input type="hidden" id="done-enf" /><input type="hidden" id="done-dl" />
+    <div id="done-info" style="background:#f7fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">完成日期</label><input class="form-control" type="date" id="done-date" /></div>
+      <div class="form-group"><label class="form-label">辦理單位</label>
+        <select class="form-control" id="done-handler" onchange="onDoneHandlerChange()"><option>本公司</option><option>委外單位</option></select>
+      </div>
+    </div>
+    <div class="form-group" id="done-handler-name-group" style="display:none;"><label class="form-label">委外單位名稱</label><input class="form-control" id="done-handler-name" placeholder="例：安正國際法律事務所" /></div>
+    <div class="form-group"><label class="form-label">狀況備註</label><textarea class="form-control" id="done-note" rows="3" placeholder="例：已由事務所代為補正，無書面文件；已繳執行費 7,432 元"></textarea></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+      <button class="btn btn-outline" onclick="closeDoneModal()">取消</button>
+      <button class="btn btn-success" onclick="saveDone()">確認完成</button>
+    </div>
   </div>
 </div>
 
@@ -739,6 +836,7 @@ const FEES_KEY       = 'bznk_fees_v2';
 const REVIEWS_KEY    = 'bznk_reviews_v1';
 const RECOVERIES_KEY = 'bznk_recoveries_v1';
 const OFFSETS_KEY    = 'bznk_offsets_v1';
+const ENFORCE_KEY    = 'bznk_enforcements_v1';
 
 function loadCases()   { try { return JSON.parse(localStorage.getItem(CASES_KEY)   || '[]'); } catch(e) { return []; } }
 function saveCases(d)  { localStorage.setItem(CASES_KEY,   JSON.stringify(d)); }
@@ -750,6 +848,8 @@ function loadRecoveries() { try { return JSON.parse(localStorage.getItem(RECOVER
 function saveRecoveries(d){ localStorage.setItem(RECOVERIES_KEY, JSON.stringify(d)); }
 function loadOffsets()    { try { return JSON.parse(localStorage.getItem(OFFSETS_KEY)||'[]');    } catch(e) { return []; } }
 function saveOffsets(d)   { localStorage.setItem(OFFSETS_KEY,    JSON.stringify(d)); }
+function loadEnforcements() { try { return JSON.parse(localStorage.getItem(ENFORCE_KEY)||'[]'); } catch(e) { return []; } }
+function saveEnforcements(d){ localStorage.setItem(ENFORCE_KEY,    JSON.stringify(d)); }
 
 function caseRecoverySummary(caseId) {
   const recs = loadRecoveries().filter(r=>r.caseId===caseId);
@@ -921,7 +1021,7 @@ function renderTable() {
       <td style="padding:10px 12px;font-size:12px;font-family:monospace;color:#4a5568;">${c.id}</td>
       <td style="padding:10px 12px;font-weight:600;">${c.name} <span class="badge badge-${c.borrowerType||'自然人'}" style="font-size:10px;">${c.borrowerType==='法人'?'法人':'自然人'}</span>${isCert?` <span style="font-size:10px;color:#6b46c1;font-weight:600;">📅${certCount}次</span>`:''}</td>
       <td style="padding:10px 12px;color:#c53030;font-weight:600;">${fmtM(c.amount)}${c.interest?`<span style='font-size:10px;color:#718096;'>+息${fmtM(c.interest)}</span>`:''}<br><span style='font-size:11px;color:#718096;font-weight:400;'>逾期 ${calcDays(c.date)} 天｜餘${fmtM(c.amount-caseRecoverySummary(c.id).recovered)}</span></td>
-      <td style="padding:10px 12px;"><span class="badge badge-${c.stage}">${c.stage}</span></td>
+      <td style="padding:10px 12px;"><span class="badge badge-${c.stage}">${c.stage}</span>${Object.keys(ENF_TRACKS).map(t=>{const st=enfTrackState(c.id,t);return `<br><span class="enf-chip ${st.cls}">${ENF_TRACKS[t].icon}${t} ${st.label}</span>`;}).join('')}</td>
       <td style="padding:10px 12px;font-size:12px;color:#4a5568;">${c.lawyer||'—'}</td>
       <td style="padding:10px 12px;font-size:12px;color:#4a5568;">${c.court||'—'}</td>
       <td style="padding:10px 12px;font-size:12px;color:#c53030;font-weight:600;">${totalOut>0?fmtM(totalOut):'—'}</td>
@@ -1303,13 +1403,14 @@ function saveCase() {
   saveCases(cases); closeModal('case-modal'); refresh();
 }
 function deleteCase(id) {
-  if(!confirm(`確定要刪除案件 ${id}？\n相關費用、收款記錄、年度調閱記錄也會一併刪除。`)) return;
+  if(!confirm(`確定要刪除案件 ${id}？\n相關費用、收款記錄、年度調閱記錄、強制執行明細也會一併刪除。`)) return;
   const cFees = loadFees().filter(f=>f.caseId===id).map(f=>f.id);
   saveCases(loadCases().filter(c=>c.id!==id));
   saveFees(loadFees().filter(f=>f.caseId!==id));
   saveReviews(loadReviews().filter(r=>r.caseId!==id));
   saveRecoveries(loadRecoveries().filter(r=>r.caseId!==id));
   saveOffsets(loadOffsets().filter(o=>o.caseId!==id));
+  saveEnforcements(loadEnforcements().filter(e=>e.caseId!==id));
   refresh();
 }
 
@@ -1407,6 +1508,7 @@ function viewDetail(id) {
         <tfoot><tr style="background:#f0fff4;font-weight:700;"><td style="padding:8px 12px;">合計</td><td style="padding:8px 12px;color:#276749;">${fmtM(recovered)}</td><td colspan="2" style="padding:8px 12px;color:#dd6b20;">剩餘 ${fmtM(remaining)}</td></tr></tfoot>
       </table>`:''}`;
     })()}
+    ${renderEnfSection(c)}
     ${c.gdlink?`<div class="gd-note" style="justify-content:space-between;">
       <span>📂 <a href="${c.gdlink}" target="_blank" style="color:#2b6cb0;font-weight:600;">開啟 Google Drive 法院文件資料夾</a></span>
       <button class="btn btn-outline btn-sm" onclick="syncDriveFiles('${c.id}','${c.gdlink}')" style="font-size:12px;">🔄 同步文件清單</button>
@@ -1427,6 +1529,218 @@ function viewDetail(id) {
       <button class="btn btn-purple" onclick="closeModal('detail-modal');openDocChooser('${c.id}')">📄 產出公文</button>
     </div>`;
   openModal('detail-modal');
+}
+
+// ── 強制執行明細（不動產／動產）────────────────────
+const ENF_TRACKS = {
+  '不動產': {
+    icon:'🏠',
+    kinds:['房地','土地','建物','其他'],
+    statuses:['聲請／囑託執行','查封','測量／鑑價','詢價／定底價','第1次拍賣','第2次拍賣','第3次拍賣','特別變賣／公告應買','第4次拍賣','拍定','承受','分配中','併入他案／參與分配','終結－已受償','終結－發債權憑證','撤回／撤封'],
+    placeholder:'例：臺南市東山區○○段123地號、門牌地址',
+  },
+  '動產': {
+    icon:'💰',
+    kinds:['銀行存款','保險','薪資','應收帳款／工程款','股票／有價證券','車輛','其他'],
+    statuses:['聲請／囑託執行','扣押命令','第三人陳報－有款','第三人陳報－無款','已被他案扣押','收取／支付轉給命令','按月扣薪中','分配中','併入他案／參與分配','終結－已受償','終結－無款可扣','終結－發債權憑證','撤回'],
+    placeholder:'例：中國信託西屯分行存款、南山人壽保單、○○公司薪資',
+  },
+};
+function uid(prefix){ return prefix+Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+function escH(s){ return String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
+function isEnfClosed(status){ return /^(終結|撤回)/.test(status||''); }
+function openDeadlines(e){ return (e.deadlines||[]).filter(dl=>!dl.done).sort((a,b)=>a.date.localeCompare(b.date)); }
+function daysFromToday(dateStr){ return Math.round((new Date(dateStr+'T00:00:00')-new Date(today()+'T00:00:00'))/86400000); }
+function enfTrackState(caseId, track){
+  const items=loadEnforcements().filter(e=>e.caseId===caseId&&e.track===track);
+  const active=items.filter(e=>!isEnfClosed(e.status)).length;
+  const recovered=items.reduce((s,e)=>s+Number(e.recovered||0),0);
+  if(!items.length) return {label:'未執行',cls:'none',items,active,recovered};
+  if(active) return {label:`進行中 ${active}/${items.length}`,cls:'active',items,active,recovered};
+  return {label:'已終結',cls:'done',items,active,recovered};
+}
+function enfItemHtml(e){
+  const closed=isEnfClosed(e.status);
+  const logs=(e.logs||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
+  const next=openDeadlines(e).map(dl=>{
+    const d=daysFromToday(dl.date);
+    return `<div class="enf-next ${d<0?'overdue':''}">📌 ${dl.date} ${escH(dl.note)}（${d<0?`已過 ${-d} 天`:d===0?'今天':`還有 ${d} 天`}）
+      <button class="btn btn-success btn-sm" style="margin-left:6px;" onclick="openDoneModal('${e.id}','${dl.id}')">✔ 完成</button></div>`;
+  }).join('');
+  const logHtml=logs.length?`<details ${logs.length<=2?'open':''}><summary style="cursor:pointer;color:#718096;margin-top:4px;">進度紀錄（${logs.length}）</summary>
+    <ul class="enf-log">${logs.map(l=>`<li><b>${l.date}</b>${escH(l.text)}</li>`).join('')}</ul></details>`:'';
+  return `<div class="enf-item ${closed?'closed':''}">
+    <div style="display:flex;justify-content:space-between;gap:6px;align-items:flex-start;">
+      <div class="enf-target">${escH(e.kind)}｜${escH(e.target)}</div>
+      <div style="display:flex;gap:4px;flex-shrink:0;">
+        <button class="btn btn-outline btn-sm" onclick="openEnfModal('${e.caseId}','${e.track}','${e.id}')">更新</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteEnforcement('${e.id}')">刪除</button>
+      </div>
+    </div>
+    <div class="enf-meta">債務人：${escH(e.debtor||'—')}｜${escH(e.court||'—')} ${escH(e.casenumber||'')}</div>
+    <div><span class="enf-status ${closed?'closed':''}">${escH(e.status)}</span>${Number(e.recovered||0)>0?` <span style="color:#276749;font-weight:600;margin-left:6px;">受償 ${fmtM(e.recovered)}</span>`:''}</div>
+    ${next}${logHtml}
+  </div>`;
+}
+function renderEnfSection(c){
+  return `<div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#2d3748;">⚖️ 強制執行明細</div>
+  <div class="enf-grid">${Object.keys(ENF_TRACKS).map(track=>{
+    const st=enfTrackState(c.id,track);
+    const items=st.items.slice().sort((a,b)=>isEnfClosed(a.status)-isEnfClosed(b.status)||((openDeadlines(a)[0]||{}).date||'9').localeCompare((openDeadlines(b)[0]||{}).date||'9'));
+    return `<div class="enf-panel ${track==='不動產'?'re':'mv'}">
+      <div class="enf-head"><span>${ENF_TRACKS[track].icon} ${track}執行 <span class="enf-state ${st.cls}">${st.label}</span></span>
+        <button class="btn btn-outline btn-sm" onclick="openEnfModal('${c.id}','${track}')">＋ 新增標的</button></div>
+      ${st.recovered>0?`<div style="font-size:12px;color:#276749;margin-bottom:6px;">累計受償 ${fmtM(st.recovered)}</div>`:''}
+      ${items.length?items.map(enfItemHtml).join(''):'<div style="text-align:center;color:#a0aec0;padding:12px;font-size:12px;">尚無執行標的</div>'}
+    </div>`;
+  }).join('')}</div>`;
+}
+function openEnfModal(caseId, track, id=''){
+  const c=loadCases().find(x=>x.id===caseId); if(!c) return;
+  const e=id?loadEnforcements().find(x=>x.id===id):null;
+  const cfg=ENF_TRACKS[track];
+  closeModal('detail-modal');
+  document.getElementById('enf-modal-title').textContent=`${cfg.icon} ${e?'更新':'新增'}${track}執行標的｜${c.name}`;
+  document.getElementById('enf-id').value=id;
+  document.getElementById('enf-case').value=caseId;
+  document.getElementById('enf-track').value=track;
+  const debtors=[c.name,...(c.guarantors||[]).map(g=>g.name)].filter(Boolean);
+  if(e&&e.debtor&&!debtors.includes(e.debtor)) debtors.push(e.debtor);
+  document.getElementById('enf-kind').innerHTML=cfg.kinds.map(k=>`<option ${e&&e.kind===k?'selected':''}>${k}</option>`).join('');
+  document.getElementById('enf-debtor').innerHTML=debtors.map(d=>`<option ${e&&e.debtor===d?'selected':''}>${escH(d)}</option>`).join('');
+  document.getElementById('enf-status').innerHTML=cfg.statuses.map(s=>`<option ${e&&e.status===s?'selected':''}>${s}</option>`).join('');
+  const tgt=document.getElementById('enf-target'); tgt.placeholder=cfg.placeholder; tgt.value=e?e.target:'';
+  document.getElementById('enf-court').value=e?e.court||'':(c.court||'');
+  document.getElementById('enf-casenumber').value=e?e.casenumber||'':'';
+  document.getElementById('enf-recovered').value=e&&e.recovered?e.recovered:'';
+  document.getElementById('enf-dl-date').value='';
+  document.getElementById('enf-dl-note').value='';
+  renderEnfDeadlineList(e);
+  document.getElementById('enf-log-date').value=today();
+  document.getElementById('enf-log-text').value='';
+  renderEnfLogList(e);
+  openModal('enf-modal');
+}
+function renderEnfLogList(e){
+  const wrap=document.getElementById('enf-log-list');
+  const logs=e?(e.logs||[]).slice().sort((a,b)=>b.date.localeCompare(a.date)):[];
+  wrap.style.display=logs.length?'block':'none';
+  wrap.innerHTML=`<div style="font-size:12px;font-weight:700;color:#4a5568;margin-bottom:6px;">已有紀錄</div>`+logs.map(l=>`<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:3px 0;border-top:1px solid #edf2f7;">
+    <span><b>${l.date}</b> ${escH(l.text)}</span><button class="btn btn-danger btn-sm" onclick="deleteEnfLog('${e.id}','${l.id}')">刪除</button></div>`).join('');
+}
+function renderEnfDeadlineList(e){
+  const wrap=document.getElementById('enf-dl-list');
+  const dls=e?openDeadlines(e):[];
+  wrap.style.display=dls.length?'block':'none';
+  wrap.innerHTML=`<div style="font-size:12px;font-weight:700;color:#4a5568;margin-bottom:6px;">未完成的期日／待辦</div>`+dls.map(dl=>`<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:3px 0;border-top:1px solid #fde68a;">
+    <span><b>${dl.date}</b> ${escH(dl.note)}</span><button class="btn btn-danger btn-sm" onclick="deleteDeadline('${e.id}','${dl.id}')">刪除</button></div>`).join('');
+}
+function deleteDeadline(enfId, dlId){
+  if(!confirm('確定刪除這個期日／待辦？（如果已經處理完，請改用「✔ 完成」留下紀錄）')) return;
+  const list=loadEnforcements().map(x=>x.id===enfId?{...x,deadlines:(x.deadlines||[]).filter(d=>d.id!==dlId)}:x);
+  saveEnforcements(list); renderEnfDeadlineList(list.find(x=>x.id===enfId)); refresh();
+}
+function openDoneModal(enfId, dlId){
+  const e=loadEnforcements().find(x=>x.id===enfId); if(!e) return;
+  const dl=(e.deadlines||[]).find(d=>d.id===dlId); if(!dl) return;
+  window._doneReturnToDetail=document.getElementById('detail-modal').classList.contains('active');
+  closeModal('detail-modal');
+  document.getElementById('done-enf').value=enfId;
+  document.getElementById('done-dl').value=dlId;
+  document.getElementById('done-info').innerHTML=`<b>${escH(e.target)}</b>｜${escH(e.court||'')} ${escH(e.casenumber||'')}<br>📌 ${dl.date} ${escH(dl.note)}`;
+  document.getElementById('done-date').value=today();
+  document.getElementById('done-handler').value='本公司';
+  document.getElementById('done-handler-name').value='';
+  document.getElementById('done-note').value='';
+  onDoneHandlerChange();
+  openModal('done-modal');
+}
+function onDoneHandlerChange(){
+  const ext=document.getElementById('done-handler').value==='委外單位';
+  document.getElementById('done-handler-name-group').style.display=ext?'block':'none';
+}
+function closeDoneModal(){
+  closeModal('done-modal');
+  const e=loadEnforcements().find(x=>x.id===document.getElementById('done-enf').value);
+  if(window._doneReturnToDetail&&e) viewDetail(e.caseId);
+}
+function saveDone(){
+  const enfId=document.getElementById('done-enf').value, dlId=document.getElementById('done-dl').value;
+  const date=document.getElementById('done-date').value||today();
+  const handler=document.getElementById('done-handler').value;
+  const handlerName=document.getElementById('done-handler-name').value.trim();
+  const note=document.getElementById('done-note').value.trim();
+  if(handler==='委外單位'&&!handlerName){ alert('請填寫委外單位名稱'); return; }
+  const who=handler==='委外單位'?`委外：${handlerName}`:'本公司';
+  const list=loadEnforcements().map(x=>{
+    if(x.id!==enfId) return x;
+    const deadlines=(x.deadlines||[]).map(d=>d.id===dlId?{...d,done:true,doneDate:date,handler:who,doneNote:note}:d);
+    const dl=deadlines.find(d=>d.id===dlId);
+    return {...x,deadlines,logs:[...(x.logs||[]),{id:uid('L'),date,text:`✔ 已完成：${dl?dl.note:''}（${who}）${note?'｜'+note:''}`}]};
+  });
+  saveEnforcements(list); refresh(); closeDoneModal();
+}
+function closeEnfModal(){
+  const caseId=document.getElementById('enf-case').value;
+  closeModal('enf-modal'); if(caseId) viewDetail(caseId);
+}
+function saveEnforcement(){
+  const id=document.getElementById('enf-id').value;
+  const caseId=document.getElementById('enf-case').value;
+  const target=document.getElementById('enf-target').value.trim();
+  if(!target){ alert('請填寫標的說明（例如銀行分行、地號或門牌）'); return; }
+  const list=loadEnforcements();
+  const old=id?list.find(x=>x.id===id):null;
+  const data={
+    id:id||(uid('E')), caseId, track:document.getElementById('enf-track').value,
+    kind:document.getElementById('enf-kind').value, target,
+    debtor:document.getElementById('enf-debtor').value,
+    court:document.getElementById('enf-court').value.trim(),
+    casenumber:document.getElementById('enf-casenumber').value.trim(),
+    status:document.getElementById('enf-status').value,
+    recovered:Number(document.getElementById('enf-recovered').value)||0,
+    deadlines:old?(old.deadlines||[]).slice():[],
+    logs:old?(old.logs||[]).slice():[],
+  };
+  const dlDate=document.getElementById('enf-dl-date').value;
+  const dlNote=document.getElementById('enf-dl-note').value.trim();
+  if(dlNote&&!dlDate){ alert('請填寫期日／待辦的日期'); return; }
+  if(dlDate) data.deadlines.push({id:uid('D'),date:dlDate,note:dlNote||'（未填事項）',done:false});
+  const logDate=document.getElementById('enf-log-date').value||today();
+  const logText=document.getElementById('enf-log-text').value.trim();
+  if(logText) data.logs.push({id:uid('L'),date:logDate,text:logText});
+  else if(!old) data.logs.push({id:uid('L'),date:logDate,text:`建立標的，進度：${data.status}`});
+  else if(old.status!==data.status) data.logs.push({id:uid('L'),date:logDate,text:`進度改為：${data.status}`});
+  saveEnforcements(old?list.map(x=>x.id===id?data:x):[...list,data]);
+  closeModal('enf-modal'); refresh(); viewDetail(caseId);
+}
+function deleteEnforcement(id){
+  const e=loadEnforcements().find(x=>x.id===id); if(!e) return;
+  if(!confirm(`確定刪除執行標的「${e.target}」及其所有進度紀錄？`)) return;
+  saveEnforcements(loadEnforcements().filter(x=>x.id!==id)); refresh(); viewDetail(e.caseId);
+}
+function deleteEnfLog(enfId, logId){
+  if(!confirm('確定刪除這筆進度紀錄？')) return;
+  const list=loadEnforcements().map(x=>x.id===enfId?{...x,logs:(x.logs||[]).filter(l=>l.id!==logId)}:x);
+  saveEnforcements(list); renderEnfLogList(list.find(x=>x.id===enfId)); refresh();
+}
+function renderUpcoming(){
+  const panel=document.getElementById('upcoming-panel'); if(!panel) return;
+  const cases=loadCases();
+  const rows=[];
+  loadEnforcements().forEach(e=>{
+    const c=cases.find(c=>c.id===e.caseId); if(!c) return;
+    openDeadlines(e).forEach(dl=>{ const d=daysFromToday(dl.date); if(d<=30) rows.push({e,c,dl,d}); });
+  });
+  rows.sort((a,b)=>a.dl.date.localeCompare(b.dl.date));
+  if(!rows.length){ panel.innerHTML=''; return; }
+  panel.innerHTML=`<div class="upcoming"><div style="font-weight:700;font-size:13px;color:#92400e;margin-bottom:4px;">📌 近期期日（30 天內）</div>
+    ${rows.map(({e,c,dl,d})=>`<div class="upcoming-row ${d<0?'overdue':''}" onclick="viewDetail('${c.id}')">
+      <span class="upcoming-date">${dl.date}</span>
+      <span style="min-width:74px;color:${d<0?'#c53030':'#718096'};font-size:12px;">${d<0?`已過 ${-d} 天`:d===0?'今天':`還有 ${d} 天`}</span>
+      <span style="flex:1;"><b>${escH(c.name)}</b>｜${ENF_TRACKS[e.track]?ENF_TRACKS[e.track].icon:''} ${escH(e.target)}｜${escH(dl.note)}</span>
+      <button class="btn btn-success btn-sm" onclick="event.stopPropagation();openDoneModal('${e.id}','${dl.id}')">✔ 完成</button>
+    </div>`).join('')}</div>`;
 }
 
 // ── 費用相關 ──────────────────────────────────────
@@ -1837,7 +2151,7 @@ function exportExcel() {
 
 // ── 整體刷新 ──────────────────────────────────────
 function refresh() {
-  renderStats(); renderCharts(); renderTable();
+  renderStats(); renderCharts(); renderTable(); renderUpcoming();
   if(document.getElementById('tab-fees').classList.contains('active')) renderFeeTable();
   if(document.getElementById('tab-reviews').classList.contains('active')) renderReviewsTab();
   // 資料有變更時觸發 GD 自動匯出（debounce 3秒）
@@ -3018,7 +3332,8 @@ function calcDataHash() {
     localStorage.getItem('bznk_fees_v2')||'',
     localStorage.getItem('bznk_reviews_v1')||'',
     localStorage.getItem('bznk_recoveries_v1')||'',
-    localStorage.getItem('bznk_offsets_v1')||''
+    localStorage.getItem('bznk_offsets_v1')||'',
+    localStorage.getItem('bznk_enforcements_v1')||''
   ].join('|');
   let h=0;
   for(let i=0;i<raw.length;i++){h=Math.imul(31,h)+raw.charCodeAt(i)|0;}
@@ -3064,6 +3379,15 @@ function buildCsvContent() {
     return [r.caseId,c?c.name:'',r.date,r.amount,r.notes||''];
   });
 
+  const enfHeaders=['案件編號','借款人','執行類別','標的類別','標的說明','債務人','執行法院','執行案號','目前進度','受償金額','未完成期日／待辦','已完成待辦','進度紀錄'];
+  const enfRows=loadEnforcements().map(e=>{
+    const c=cases.find(c=>c.id===e.caseId);
+    const logs=(e.logs||[]).slice().sort((a,b)=>a.date.localeCompare(b.date)).map(l=>`${l.date} ${l.text}`).join('；');
+    const openDl=openDeadlines(e).map(d=>`${d.date} ${d.note}`).join('；');
+    const doneDl=(e.deadlines||[]).filter(d=>d.done).map(d=>`${d.date} ${d.note}（${d.doneDate} 完成，${d.handler||''}${d.doneNote?'，'+d.doneNote:''}）`).join('；');
+    return [e.caseId,c?c.name:'',e.track,e.kind,e.target,e.debtor||'',e.court||'',e.casenumber||'',e.status,e.recovered||0,openDl,doneDl,logs];
+  });
+
   let csv='﻿';
   csv+='=== 案件清單 ===\n'+caseHeaders.map(esc).join(',')+'\n';
   caseRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
@@ -3073,6 +3397,8 @@ function buildCsvContent() {
   offRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
   csv+='\n=== 本金催回明細 ===\n'+recHeaders.map(esc).join(',')+'\n';
   recRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
+  csv+='\n=== 強制執行明細 ===\n'+enfHeaders.map(esc).join(',')+'\n';
+  enfRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
   csv+='\n=== 債權憑證年度調閱記錄 ===\n'+revHeaders.map(esc).join(',')+'\n';
   revRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
   return csv;
