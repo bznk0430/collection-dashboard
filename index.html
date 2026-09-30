@@ -204,6 +204,7 @@
   .login-btn img { width: 20px; height: 20px; }
   .login-err { margin-top: 14px; font-size: 12px; color: #e53e3e; display: none; }
   .login-loading { margin-top: 14px; font-size: 12px; color: #718096; display: none; }
+  .backup-status { margin-left:8px; font-size:11px; opacity:0.85; } .backup-status.warn { color:#fde68a; opacity:1; } .backup-status.err { color:#fecaca; opacity:1; }
   .user-chip { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.15); border-radius: 20px; padding: 5px 12px 5px 6px; font-size: 12px; color: white; }
   .user-chip img { width: 24px; height: 24px; border-radius: 50%; }
   .user-chip .logout-btn { background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 10px; padding: 2px 8px; font-size: 11px; cursor: pointer; margin-left: 4px; }
@@ -254,13 +255,14 @@
 <div class="header">
   <div>
     <h1>📋 逾期催收案件管理系統</h1>
-    <div class="subtitle">網路借貸媒合平臺 · 法律催收控管</div>
+    <div class="subtitle">網路借貸媒合平臺 · 法律催收控管 <span id="backup-status" class="backup-status"></span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" onclick="openSettings()" style="background:rgba(255,255,255,0.15);color:white;border-color:rgba(255,255,255,0.3);">⚙ 系統設定</button>
     <button class="btn btn-outline" onclick="exportExcel()" style="background:rgba(255,255,255,0.15);color:white;border-color:rgba(255,255,255,0.3);">⬇ 匯出 Excel</button>
     <button class="btn btn-outline" onclick="document.getElementById('enf-import-file').click()" style="background:rgba(255,255,255,0.15);color:white;border-color:rgba(255,255,255,0.3);">⬆ 匯入執行明細</button>
     <input type="file" id="enf-import-file" accept=".json,application/json" style="display:none;" onchange="importEnforcementsFile(this)" />
+    <button class="btn btn-outline" id="backup-btn" onclick="manualBackup()" style="background:rgba(255,255,255,0.15);color:white;border-color:rgba(255,255,255,0.3);" title="重新整理畫面並立即把目前資料備份到 Google Drive">☁ 立即備份</button>
     <button class="btn btn-success" onclick="openAddCase()">＋ 新增案件</button>
     <div class="user-chip" id="user-chip" style="display:none;">
       <img id="user-photo" src="" alt="">
@@ -437,7 +439,7 @@
         </div>
 
         <h4 style="font-size:13px;font-weight:700;margin-bottom:8px;color:#2d3748;">資料儲存與備份</h4>
-        <p style="font-size:13px;">資料存於瀏覽器本地端。建議定期點擊「匯出 Excel」備份，匯出檔案包含案件清單、費用與收款明細、費用沖銷明細、本金催回明細、強制執行明細、年度調閱記錄等區塊。</p>
+        <p style="font-size:13px;">資料存於瀏覽器本地端，每個人的電腦各自一份。登入後資料有變更時會自動備份到 Google Drive；也可以隨時按「☁ 立即備份」（未授權時會跳出 Google 視窗），標題下方會顯示上次備份時間。備份檔名帶有帳號，只會取代自己之前的備份，不會刪到同事的檔案。另可點擊「匯出 Excel」下載一份，匯出檔案包含案件清單、費用與收款明細、費用沖銷明細、本金催回明細、強制執行明細、年度調閱記錄等區塊。</p>
       </div>
     </div>
   </div>
@@ -2200,6 +2202,7 @@ function refresh() {
   // 資料有變更時觸發 GD 自動匯出（debounce 3秒）
   clearTimeout(window._exportTimer);
   window._exportTimer = setTimeout(autoExportToDrive, 3000);
+  renderBackupStatus();
 }
 
 document.querySelectorAll('.modal-overlay').forEach(el=>{
@@ -3447,66 +3450,101 @@ function buildCsvContent() {
   return csv;
 }
 
-async function autoExportToDrive() {
-  if (!window._driveToken) return;
-  if (window._exportInProgress) return; // 避免同時跑兩次
-
+function backupOwnerTag() {
+  const email=(auth.currentUser&&auth.currentUser.email)||'';
+  return email.split('@')[0]||'unknown';
+}
+function renderBackupStatus(msg, cls) {
+  const el=document.getElementById('backup-status'); if(!el) return;
+  if(msg){ el.textContent=msg; el.className='backup-status '+(cls||''); return; }
+  let last={}; try{ last=JSON.parse(localStorage.getItem(EXPORT_HASH_KEY)||'{}'); }catch(e){}
+  const changed=last.hash&&last.hash!==calcDataHash();
+  if(!last.time){ el.textContent=window._driveToken?'尚未備份到 Drive':'未連線 Drive（按「☁ 立即備份」）'; el.className='backup-status warn'; return; }
+  el.textContent=`上次備份 ${last.time}${changed?'（之後有變更未備份）':''}`;
+  el.className='backup-status '+(changed?'warn':'');
+}
+// 上傳備份到 GD：檔名帶帳號，只取代自己之前的備份，不動同事的檔案
+async function uploadBackupToDrive() {
+  if (!window._driveToken) throw new Error('no-token');
   const currentHash = calcDataHash();
-  const currentDate = today();
-  // 讀取上次匯出記錄 {hash, date}
-  let lastExport = {};
-  try { lastExport = JSON.parse(localStorage.getItem(EXPORT_HASH_KEY)||'{}'); } catch(e){}
-
-  // 今天已匯出過 → 跳過
-  if (lastExport.date === currentDate) return;
-
-  // 資料跟上次匯出時完全一樣 → 只更新日期，不重新上傳
-  if (currentHash === lastExport.hash) {
-    localStorage.setItem(EXPORT_HASH_KEY, JSON.stringify({hash:currentHash, date:currentDate}));
-    return;
+  const owner = backupOwnerTag();
+  const prefix = `催收案件報表_${owner}_`;
+  const filename = `${prefix}${today()}.csv`;
+  const csv = buildCsvContent();
+  const auth_ = {Authorization:'Bearer '+window._driveToken};
+  const searchQ = encodeURIComponent(`'${AUTO_EXPORT_FOLDER}' in parents and name contains '${prefix}' and trashed=false`);
+  const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${searchQ}&fields=files(id,name)&supportsAllDrives=true&includeItemsFromAllDrives=true`, {headers:auth_});
+  if (searchRes.status===401) { window._driveToken=null; throw new Error('no-token'); }
+  if (!searchRes.ok) throw new Error('search '+searchRes.status);
+  const old = ((await searchRes.json()).files||[]).filter(f=>f.name.startsWith(prefix));
+  const meta = JSON.stringify({name: filename, parents:[AUTO_EXPORT_FOLDER]});
+  const boundary = '-------bznk_boundary';
+  const body = [
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n`,
+    `--${boundary}\r\nContent-Type: text/csv; charset=UTF-8\r\n\r\n`,
+    csv,
+    `\r\n--${boundary}--`
+  ].join('');
+  // 先上傳新檔，成功後才刪除自己的舊檔，避免上傳失敗時連舊備份都沒有
+  const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true',
+    {method:'POST', headers:{...auth_, 'Content-Type':`multipart/related; boundary=${boundary}`}, body});
+  if (uploadRes.status===401) { window._driveToken=null; throw new Error('no-token'); }
+  if (!uploadRes.ok) throw new Error('upload '+uploadRes.status);
+  const created = await uploadRes.json();
+  for (const f of old) {
+    if (f.id===created.id) continue;
+    await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}?supportsAllDrives=true`, {method:'DELETE', headers:auth_});
   }
+  const now=new Date();
+  const time=`${today()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  localStorage.setItem(EXPORT_HASH_KEY, JSON.stringify({hash:currentHash, date:today(), time}));
+  console.log('[Backup] 已上傳報表到 GD：'+filename);
+  return filename;
+}
 
+// 資料有變更時自動備份（只在已取得 Drive 授權時執行）
+async function autoExportToDrive() {
+  if (!window._driveToken || window._exportInProgress) { renderBackupStatus(); return; }
+  let last = {};
+  try { last = JSON.parse(localStorage.getItem(EXPORT_HASH_KEY)||'{}'); } catch(e){}
+  if (last.time && calcDataHash() === last.hash) { renderBackupStatus(); return; } // 資料沒變 → 不重傳
   window._exportInProgress = true;
+  try { await uploadBackupToDrive(); }
+  catch(e) { console.warn('[AutoExport] 匯出失敗：', e.message); }
+  finally { window._exportInProgress = false; renderBackupStatus(); }
+}
+
+// 手動「立即備份」：未取得 Drive 授權時先跳出 Google 視窗授權，一律重新上傳
+async function manualBackup() {
+  const btn=document.getElementById('backup-btn');
+  if (window._exportInProgress) return;
+  btn.disabled=true;
   try {
-    const csv = buildCsvContent();
-    const filename = `催收案件報表_${currentDate}.csv`;
-
-    // 先查詢並刪除舊報表
-    const searchQ = encodeURIComponent(`'${AUTO_EXPORT_FOLDER}' in parents and name contains '催收案件報表_' and trashed=false`);
-    const searchRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=${searchQ}&fields=files(id,name)`,
-      {headers:{Authorization:'Bearer '+window._driveToken}}
-    );
-    if (!searchRes.ok) throw new Error('search '+searchRes.status);
-    const searchData = await searchRes.json();
-    for (const f of (searchData.files||[])) {
-      await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {
-        method:'DELETE', headers:{Authorization:'Bearer '+window._driveToken}
-      });
+    if (!window._driveToken) {
+      renderBackupStatus('等待 Google 授權…','');
+      const result = await auth.signInWithPopup(provider);
+      window._driveToken = result.credential ? result.credential.accessToken : null;
+      if (!window._driveToken) throw new Error('沒有取得 Drive 授權');
     }
-
-    // 上傳新檔案（multipart）
-    const meta = JSON.stringify({name: filename, parents:[AUTO_EXPORT_FOLDER]});
-    const boundary = '-------bznk_boundary';
-    const body = [
-      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n`,
-      `--${boundary}\r\nContent-Type: text/csv; charset=UTF-8\r\n\r\n`,
-      csv,
-      `\r\n--${boundary}--`
-    ].join('');
-    const uploadRes = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
-      {method:'POST', headers:{Authorization:'Bearer '+window._driveToken, 'Content-Type':`multipart/related; boundary=${boundary}`}, body}
-    );
-    if (!uploadRes.ok) throw new Error('upload '+uploadRes.status);
-
-    // 儲存 hash + 日期
-    localStorage.setItem(EXPORT_HASH_KEY, JSON.stringify({hash:currentHash, date:currentDate}));
-    console.log('[AutoExport] 已上傳報表到 GD：'+filename);
+    renderBackupStatus('備份中…','');
+    window._exportInProgress = true;
+    try { await uploadBackupToDrive(); }
+    catch(e) {
+      if (e.message!=='no-token') throw e;
+      window._exportInProgress = false;
+      const result = await auth.signInWithPopup(provider);   // 授權過期 → 重新授權後再試一次
+      window._driveToken = result.credential ? result.credential.accessToken : null;
+      window._exportInProgress = true;
+      await uploadBackupToDrive();
+    }
+    renderBackupStatus();
+    refresh();
   } catch(e) {
-    console.warn('[AutoExport] 匯出失敗：', e.message);
+    if (e.code==='auth/popup-closed-by-user') renderBackupStatus();
+    else renderBackupStatus('備份失敗：'+(e.message||e.code),'err');
   } finally {
     window._exportInProgress = false;
+    btn.disabled=false;
   }
 }
 
