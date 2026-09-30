@@ -261,7 +261,7 @@
   <div class="header-actions">
     <button class="btn btn-outline" onclick="openSettings()" style="background:rgba(255,255,255,0.15);color:white;border-color:rgba(255,255,255,0.3);">⚙ 系統設定</button>
     <button class="btn btn-outline" onclick="exportExcel()" style="background:rgba(255,255,255,0.15);color:white;border-color:rgba(255,255,255,0.3);">⬇ 匯出 Excel</button>
-    <button class="btn btn-outline" onclick="document.getElementById('enf-import-file').click()" style="background:rgba(255,255,255,0.15);color:white;border-color:rgba(255,255,255,0.3);">⬆ 匯入執行明細</button>
+    <button class="btn btn-outline" onclick="document.getElementById('enf-import-file').click()" style="background:rgba(255,255,255,0.15);color:white;border-color:rgba(255,255,255,0.3);">⬆ 匯入明細</button>
     <input type="file" id="enf-import-file" accept=".json,application/json" style="display:none;" onchange="importEnforcementsFile(this)" />
     <button class="btn btn-outline" id="backup-btn" onclick="manualBackup()" style="background:rgba(255,255,255,0.15);color:white;border-color:rgba(255,255,255,0.3);" title="重新整理畫面並立即把目前資料備份到 Google Drive">☁ 立即備份</button>
     <button class="btn btn-success" onclick="openAddCase()">＋ 新增案件</button>
@@ -423,7 +423,7 @@
           <p>・ 期日／待辦（拍賣日、詢價期日、補正期限等，可以有好幾個）：30 天內與已過期未完成的會顯示在案件清單上方的「近期期日」</p>
           <p>・ 處理完按「✔ 完成」：填完成日期、辦理單位（本公司或委外單位）與狀況備註，沒有文件也能留下紀錄</p>
           <p>・ 進度紀錄：每次更新可加一筆「日期＋內容」，進度有變時也會自動記錄</p>
-          <p>・ 大量補登可用上方「⬆ 匯入執行明細」匯入整理好的 JSON 檔：只新增系統還沒有的標的，同案件、同類別、同標的說明的會略過，不會修改或刪除現有資料</p>
+          <p>・ 大量補登可用上方「⬆ 匯入明細」匯入整理好的 JSON 檔，可包含執行標的、代墊費用與費用沖銷：只新增系統還沒有的資料（標的以同案件＋類別＋標的說明判斷；費用以同案件＋日期＋金額＋說明判斷），不會修改或刪除現有資料</p>
           <p style="margin-top:8px;">兩邊互不影響：可以同時進行，也可以一邊已終結、另一邊還在執行。進度選「終結」或「撤回」的標的視為結束。</p>
         </div>
 
@@ -1838,7 +1838,7 @@ function importEnforcementsFile(input){
   const reader=new FileReader();
   reader.onload=()=>{
     let data;
-    try{ data=JSON.parse(reader.result); }catch(e){ alert('檔案格式錯誤，無法讀取（需為執行明細 JSON 檔）'); return; }
+    try{ data=JSON.parse(reader.result); }catch(e){ alert('檔案格式錯誤，無法讀取（需為匯入用的 JSON 檔）'); return; }
     const incoming=Array.isArray(data)?data:(data.items||[]);
     const cases=loadCases(), existing=loadEnforcements();
     const key=e=>`${e.caseId}|${e.track}|${String(e.target||'').trim()}`;
@@ -1861,14 +1861,46 @@ function importEnforcementsFile(input){
         deadlines:(e.deadlines||[]).filter(d=>d&&d.date).map(d=>({id:uid('D'),date:d.date,note:d.note||'（未填事項）',done:false})),
         logs});
     });
-    const lines=[`將新增 ${add.length} 筆執行標的`];
-    if(dup.length) lines.push(`略過 ${dup.length} 筆（系統已有相同標的）`);
+    // 代墊費用：同 id，或同案件＋同日期＋同金額＋同說明，視為已存在
+    const FEE_TYPES=['律師費','訴訟費','存證信函費','查址費','徵信費','執行費','委外催收費','其他費用'];
+    const exFees=loadFees(), exOffs=loadOffsets();
+    const feeKey=f=>`${f.caseId}|${f.date}|${Number(f.amount)||0}|${String(f.desc||'').trim()}`;
+    const feeIds=new Set(exFees.map(f=>f.id)), feeKeys=new Set(exFees.map(feeKey));
+    const addFees=[], dupFees=[];
+    (Array.isArray(data)?[]:(data.fees||[])).forEach(f=>{
+      if(!f||!f.caseId||!f.date||!(Number(f.amount)>0)){ bad.push((f&&f.desc)||'(費用)'); return; }
+      if(!cases.some(c=>c.id===f.caseId)){ noCase.add(f.caseId); return; }
+      if((f.id&&feeIds.has(f.id))||feeKeys.has(feeKey(f))){ dupFees.push(f); return; }
+      const rec={id:f.id||uid('F'), caseId:f.caseId, date:f.date, type:FEE_TYPES.includes(f.type)?f.type:'其他費用',
+        desc:String(f.desc||''), amount:Number(f.amount), pay:f.pay||'公司代墊', receipt:f.receipt||'', isPayment:false};
+      feeIds.add(rec.id); addFees.push(rec);   // 同一檔內金額相同的多筆費用都保留，只跟系統既有資料比對
+    });
+    // 費用沖銷：要對得到系統或本檔內的費用
+    const offIds=new Set(exOffs.map(o=>o.id));
+    const addOffs=[], dupOffs=[];
+    (Array.isArray(data)?[]:(data.offsets||[])).forEach(o=>{
+      if(!o||!o.feeId||!(Number(o.amount)>0)){ bad.push('(沖銷)'); return; }
+      if(o.id&&offIds.has(o.id)){ dupOffs.push(o); return; }
+      const fee=[...exFees,...addFees].find(f=>f.id===o.feeId);
+      if(!fee){ bad.push('(沖銷對不到費用)'); return; }
+      offIds.add(o.id); addOffs.push({id:o.id||uid('O'), feeId:o.feeId, caseId:fee.caseId, date:o.date||today(), amount:Number(o.amount), notes:o.notes||''});
+    });
+    const lines=[];
+    if(incoming.length) lines.push(`將新增 ${add.length} 筆執行標的`);
+    if(addFees.length||dupFees.length) lines.push(`將新增 ${addFees.length} 筆代墊費用（合計 ${addFees.reduce((s,f)=>s+f.amount,0).toLocaleString('zh-TW')} 元）`);
+    if(addOffs.length||dupOffs.length) lines.push(`將新增 ${addOffs.length} 筆費用沖銷`);
+    if(dup.length) lines.push(`略過 ${dup.length} 筆執行標的（系統已有相同標的）`);
+    if(dupFees.length) lines.push(`略過 ${dupFees.length} 筆代墊費用（系統已有）`);
+    if(dupOffs.length) lines.push(`略過 ${dupOffs.length} 筆費用沖銷（系統已有）`);
     if(noCase.size) lines.push(`略過 ${[...noCase].length} 個系統內找不到的案件：${[...noCase].join('、')}`);
     if(bad.length) lines.push(`略過 ${bad.length} 筆格式不完整的資料`);
-    if(!add.length){ alert(lines.join('\n')); return; }
+    if(!add.length&&!addFees.length&&!addOffs.length){ alert(lines.join('\n')||'檔案裡沒有可以匯入的資料'); return; }
     if(!confirm(lines.join('\n')+'\n\n只會新增，不會修改或刪除現有資料。確定匯入？')) return;
-    saveEnforcements([...existing,...add]); refresh();
-    alert(`已匯入 ${add.length} 筆執行標的。`);
+    if(add.length) saveEnforcements([...existing,...add]);
+    if(addFees.length) saveFees([...exFees,...addFees]);
+    if(addOffs.length) saveOffsets([...exOffs,...addOffs]);
+    refresh();
+    alert(`已匯入：執行標的 ${add.length} 筆、代墊費用 ${addFees.length} 筆、費用沖銷 ${addOffs.length} 筆。`);
   };
   reader.readAsText(file,'utf-8');
 }
