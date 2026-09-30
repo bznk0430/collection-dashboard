@@ -6,6 +6,7 @@
 <title>逾期催收案件管理系統</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridjs@5.0.2/dist/theme/mermaid.min.css" integrity="sha384-jZvDSsmGB9oGGT/4l9bHXGoAv1OxvG/cFmSo0dZaSqmBgvQTKDBFAMftlXTmMbNW" crossorigin="anonymous">
 <script src="https://cdn.jsdelivr.net/npm/gridjs@5.0.2/dist/gridjs.umd.js" integrity="sha384-/XXDzxe4FsGiAe50i/u9pY/Vy/uX654MHB1xoc1BJNnH1WXHhqHga9g3q5tF4gj7" crossorigin="anonymous"></script>
@@ -255,7 +256,7 @@
 <div class="header">
   <div>
     <h1>📋 逾期催收案件管理系統</h1>
-    <div class="subtitle">網路借貸媒合平臺 · 法律催收控管 <span id="backup-status" class="backup-status"></span></div>
+    <div class="subtitle">網路借貸媒合平臺 · 法律催收控管 <span id="data-mode" class="backup-status"></span> <span id="backup-status" class="backup-status"></span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" onclick="openSettings()" style="background:rgba(255,255,255,0.15);color:white;border-color:rgba(255,255,255,0.3);">⚙ 系統設定</button>
@@ -439,7 +440,7 @@
         </div>
 
         <h4 style="font-size:13px;font-weight:700;margin-bottom:8px;color:#2d3748;">資料儲存與備份</h4>
-        <p style="font-size:13px;">資料存於瀏覽器本地端，每個人的電腦各自一份。登入後資料有變更時會自動備份到 Google Drive；也可以隨時按「☁ 立即備份」（未授權時會跳出 Google 視窗），標題下方會顯示上次備份時間。備份檔名帶有帳號，只會取代自己之前的備份，不會刪到同事的檔案。另可點擊「匯出 Excel」下載一份，匯出檔案包含案件清單、費用與收款明細、費用沖銷明細、本金催回明細、強制執行明細、年度調閱記錄等區塊。</p>
+        <p style="font-size:13px;">標題下方會顯示目前的資料模式：「💻 本機資料」存在這台電腦的瀏覽器，每個人各自一份；「☁ 共用資料庫」存在公司的 Firebase 資料庫，所有 @bznk.com 同事看到同一份，任何人更新，其他人的畫面會自動更新。網址加 ?cloud=1 改用共用資料庫（會記住），加 ?cloud=0 切回本機資料。登入後資料有變更時會自動備份到 Google Drive；也可以隨時按「☁ 立即備份」（未授權時會跳出 Google 視窗），標題下方會顯示上次備份時間。備份檔名帶有帳號，只會取代自己之前的備份，不會刪到同事的檔案。另可點擊「匯出 Excel」下載一份，匯出檔案包含案件清單、費用與收款明細、費用沖銷明細、本金催回明細、強制執行明細、年度調閱記錄等區塊。</p>
       </div>
     </div>
   </div>
@@ -596,6 +597,10 @@
       <button class="btn btn-primary" onclick="submitEnforcementDoc()">產出預覽</button>
     </div>
   </div>
+</div>
+
+<div id="cloud-loading" style="display:none;position:fixed;inset:0;background:rgba(26,32,44,0.45);z-index:3000;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:12px;padding:20px 28px;font-size:14px;color:#2d3748;">☁ 載入共用資料中…</div>
 </div>
 
 <!-- 案件詳情 Modal -->
@@ -843,18 +848,116 @@ const RECOVERIES_KEY = 'bznk_recoveries_v1';
 const OFFSETS_KEY    = 'bznk_offsets_v1';
 const ENFORCE_KEY    = 'bznk_enforcements_v1';
 
-function loadCases()   { try { return JSON.parse(localStorage.getItem(CASES_KEY)   || '[]'); } catch(e) { return []; } }
-function saveCases(d)  { localStorage.setItem(CASES_KEY,   JSON.stringify(d)); }
-function loadFees()    { try { return JSON.parse(localStorage.getItem(FEES_KEY)    || '[]'); } catch(e) { return []; } }
-function saveFees(d)   { localStorage.setItem(FEES_KEY,    JSON.stringify(d)); }
-function loadReviews() { try { return JSON.parse(localStorage.getItem(REVIEWS_KEY) || '[]'); } catch(e) { return []; } }
-function saveReviews(d){ localStorage.setItem(REVIEWS_KEY, JSON.stringify(d)); }
-function loadRecoveries() { try { return JSON.parse(localStorage.getItem(RECOVERIES_KEY)||'[]'); } catch(e) { return []; } }
-function saveRecoveries(d){ localStorage.setItem(RECOVERIES_KEY, JSON.stringify(d)); }
-function loadOffsets()    { try { return JSON.parse(localStorage.getItem(OFFSETS_KEY)||'[]');    } catch(e) { return []; } }
-function saveOffsets(d)   { localStorage.setItem(OFFSETS_KEY,    JSON.stringify(d)); }
-function loadEnforcements() { try { return JSON.parse(localStorage.getItem(ENFORCE_KEY)||'[]'); } catch(e) { return []; } }
-function saveEnforcements(d){ localStorage.setItem(ENFORCE_KEY,    JSON.stringify(d)); }
+// ── 資料存取：本機（localStorage）或共用資料庫（Firestore）──────────
+// 網址加 ?cloud=1 啟用共用資料庫（會記住），?cloud=0 切回本機資料
+(function(){ try{ const p=new URLSearchParams(location.search).get('cloud');
+  if(p==='1') localStorage.setItem('bznk_cloud_mode','1');
+  if(p==='0') localStorage.removeItem('bznk_cloud_mode'); }catch(e){} })();
+const CLOUD_MODE = (()=>{ try{ return localStorage.getItem('bznk_cloud_mode')==='1'; }catch(e){ return false; } })();
+const STORES = { cases:CASES_KEY, fees:FEES_KEY, reviews:REVIEWS_KEY, recoveries:RECOVERIES_KEY, offsets:OFFSETS_KEY, enforcements:ENFORCE_KEY };
+const _cloud = { ready:false, data:{ cases:[], fees:[], reviews:[], recoveries:[], offsets:[], enforcements:[], settings:{} } };
+function localLoad(key, def) { try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(def)); } catch(e) { return def; } }
+function stableStr(v) {
+  if (Array.isArray(v)) return '['+v.map(stableStr).join(',')+']';
+  if (v && typeof v==='object') return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stableStr(v[k])).join(',')+'}';
+  return JSON.stringify(v===undefined?null:v);
+}
+function storeLoad(name) {
+  if (CLOUD_MODE) return JSON.parse(JSON.stringify(_cloud.data[name]||[]));
+  return localLoad(STORES[name], []);
+}
+// 共用資料庫模式：只寫入有變動的紀錄、刪除被移除的紀錄（每筆紀錄是一份文件，不同人改不同紀錄不會互相覆蓋）
+function storeSave(name, arr) {
+  if (!CLOUD_MODE) { localStorage.setItem(STORES[name], JSON.stringify(arr)); return; }
+  arr.forEach(x=>{ if(x && !x.id) x.id=uid(name.slice(0,2).toUpperCase()); });
+  const next = JSON.parse(JSON.stringify(arr));
+  const prev = _cloud.data[name]||[];
+  const prevMap = new Map(prev.map(x=>[x.id, stableStr(x)]));
+  const nextIds = new Set(next.map(x=>x.id));
+  const ops = [];
+  next.forEach(x=>{ if (prevMap.get(x.id)!==stableStr(x)) ops.push({type:'set', id:x.id, data:x}); });
+  prev.forEach(x=>{ if (!nextIds.has(x.id)) ops.push({type:'del', id:x.id}); });
+  _cloud.data[name] = next;
+  commitCloudOps(name, ops);
+}
+function cloudDocId(id) { return encodeURIComponent(String(id)); }
+async function commitCloudOps(name, ops) {
+  if (!ops.length) return;
+  const db = firebase.firestore();
+  try {
+    for (let i=0; i<ops.length; i+=400) {
+      const batch = db.batch();
+      ops.slice(i,i+400).forEach(op=>{
+        const ref = db.collection(name).doc(cloudDocId(op.id));
+        if (op.type==='set') batch.set(ref, op.data); else batch.delete(ref);
+      });
+      await batch.commit();
+    }
+  } catch(e) {
+    console.error('[Cloud] 寫入失敗', e);
+    alert('共用資料庫儲存失敗：'+(e.code||e.message)+'\n請重新整理頁面確認資料後再試。');
+  }
+}
+// 登入後訂閱共用資料庫；每個集合都收到第一批資料才算載入完成，之後別人的修改會自動更新畫面
+function startCloudSync() {
+  const db = firebase.firestore();
+  const names = Object.keys(STORES);
+  return new Promise((resolve, reject)=>{
+    let pending = names.length+1;
+    const done = ()=>{ if(--pending===0){ _cloud.ready=true; resolve(); } };
+    const onErr = e=>{ console.error('[Cloud] 讀取失敗', e); if(!_cloud.ready) reject(e); };
+    names.forEach(name=>{
+      let first=true;
+      db.collection(name).onSnapshot(snap=>{
+        _cloud.data[name] = snap.docs.map(d=>d.data());
+        if (first) { first=false; done(); } else scheduleCloudRefresh();
+      }, onErr);
+    });
+    let firstS=true;
+    db.collection('meta').doc('settings').onSnapshot(d=>{
+      _cloud.data.settings = d.exists ? d.data() : {};
+      if (firstS) { firstS=false; done(); }
+    }, onErr);
+  });
+}
+function scheduleCloudRefresh() {
+  clearTimeout(window._cloudRefreshTimer);
+  window._cloudRefreshTimer = setTimeout(()=>{ if(_cloud.ready) refresh(); }, 300);
+}
+// 共用資料庫是空的時候，詢問是否把這台電腦的資料上傳為正式資料（範例資料不上傳）
+async function maybeMigrateLocalToCloud() {
+  if (_cloud.data.cases.length) return;
+  const DEMO = new Set(['CC2601-1021','CC2602-3344','CC2603-5678','CC2603-8801','CC2604-2233']);
+  const localCases = localLoad(CASES_KEY, []).filter(c=>!DEMO.has(c.id));
+  if (!localCases.length) return;
+  if (!confirm(`共用資料庫目前是空的。\n\n要把這台電腦的 ${localCases.length} 件案件，以及相關費用、收款、催回、調閱、強制執行明細與系統設定，上傳作為大家共用的正式資料嗎？\n\n只需要一個人做一次。這台電腦原本的資料會保留，不會刪除。`)) return;
+  for (const name of Object.keys(STORES)) {
+    let arr = localLoad(STORES[name], []);
+    arr = name==='cases' ? arr.filter(c=>!DEMO.has(c.id)) : arr.filter(x=>!DEMO.has(x.caseId));
+    storeSave(name, arr);
+  }
+  const st = localLoad(SETTINGS_KEY, {});
+  if (Object.keys(st).length) saveSettingsFn(st);
+  alert('已上傳到共用資料庫，其他同事用 ?cloud=1 登入後就會看到相同資料。');
+}
+function renderDataMode() {
+  const el=document.getElementById('data-mode'); if(!el) return;
+  el.textContent = CLOUD_MODE ? '☁ 共用資料庫' : '💻 本機資料';
+  el.title = CLOUD_MODE ? '資料存在共用資料庫，所有同事看到同一份（網址加 ?cloud=0 切回本機資料）' : '資料只存在這台電腦的瀏覽器（網址加 ?cloud=1 改用共用資料庫）';
+}
+
+function loadCases()        { return storeLoad('cases'); }
+function saveCases(d)       { storeSave('cases', d); }
+function loadFees()         { return storeLoad('fees'); }
+function saveFees(d)        { storeSave('fees', d); }
+function loadReviews()      { return storeLoad('reviews'); }
+function saveReviews(d)     { storeSave('reviews', d); }
+function loadRecoveries()   { return storeLoad('recoveries'); }
+function saveRecoveries(d)  { storeSave('recoveries', d); }
+function loadOffsets()      { return storeLoad('offsets'); }
+function saveOffsets(d)     { storeSave('offsets', d); }
+function loadEnforcements() { return storeLoad('enforcements'); }
+function saveEnforcements(d){ storeSave('enforcements', d); }
 
 function caseRecoverySummary(caseId) {
   const recs = loadRecoveries().filter(r=>r.caseId===caseId);
@@ -2337,8 +2440,13 @@ function appendToNotes(caseId, text) {
 
 // ── 系統設定 ──────────────────────────────────────
 const SETTINGS_KEY='bznk_settings_v1';
-function loadSettings(){try{return JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}');}catch(e){return{};}}
-function saveSettingsFn(s){localStorage.setItem(SETTINGS_KEY,JSON.stringify(s));}
+function loadSettings(){ if(CLOUD_MODE) return JSON.parse(JSON.stringify(_cloud.data.settings||{})); try{return JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}');}catch(e){return{};} }
+function saveSettingsFn(s){
+  if(!CLOUD_MODE){ localStorage.setItem(SETTINGS_KEY,JSON.stringify(s)); return; }
+  _cloud.data.settings=JSON.parse(JSON.stringify(s));
+  firebase.firestore().collection('meta').doc('settings').set(_cloud.data.settings)
+    .catch(e=>alert('共用資料庫儲存設定失敗：'+(e.code||e.message)));
+}
 
 function openSettings(){
   const s=loadSettings();
@@ -3372,19 +3480,13 @@ const AUTO_EXPORT_FOLDER='1biFWELku069XYVxgqfbu6gZpY--vRWSZ';
 const EXPORT_HASH_KEY='bznk_export_hash_v1';
 
 function calcDataHash() {
-  // 把所有 localStorage 資料串在一起算 hash（簡單 checksum）
-  const raw = [
-    localStorage.getItem('bznk_cases_v1')||'',
-    localStorage.getItem('bznk_fees_v2')||'',
-    localStorage.getItem('bznk_reviews_v1')||'',
-    localStorage.getItem('bznk_recoveries_v1')||'',
-    localStorage.getItem('bznk_offsets_v1')||'',
-    localStorage.getItem('bznk_enforcements_v1')||''
-  ].join('|');
+  // 把所有資料串在一起算 hash（簡單 checksum），本機與共用資料庫模式都適用
+  const raw = stableStr([loadCases(),loadFees(),loadReviews(),loadRecoveries(),loadOffsets(),loadEnforcements()]);
   let h=0;
   for(let i=0;i<raw.length;i++){h=Math.imul(31,h)+raw.charCodeAt(i)|0;}
   return String(h>>>0);
 }
+
 
 function buildCsvContent() {
   const cases=loadCases(), fees=loadFees(), reviews=loadReviews();
@@ -3577,6 +3679,21 @@ auth.onAuthStateChanged(user=>{
     document.getElementById('user-name').textContent=user.displayName||user.email;
     document.getElementById('user-photo').src=user.photoURL||'';
     document.getElementById('user-photo').style.display=user.photoURL?'block':'none';
+    renderDataMode();
+    if (CLOUD_MODE) {
+      if (_cloud.ready) { refresh(); return; }
+      const ov=document.getElementById('cloud-loading'); if(ov) ov.style.display='flex';
+      startCloudSync().then(async ()=>{
+        if(ov) ov.style.display='none';
+        await maybeMigrateLocalToCloud();
+        refresh();
+        setTimeout(autoExportToDrive, 2000);
+      }).catch(e=>{
+        if(ov) ov.style.display='none';
+        alert('無法讀取共用資料庫：'+(e.code||e.message)+'\n請確認用 @bznk.com 帳號登入；若持續失敗，網址加 ?cloud=0 可先切回本機資料。');
+      });
+      return;
+    }
     seedData(); refresh();
     // 登入後靜默檢查是否需要同步報表到 GD
     setTimeout(autoExportToDrive, 2000);
