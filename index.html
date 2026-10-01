@@ -230,6 +230,11 @@
   .enf-log b { color:#2d3748; font-weight:600; margin-right:6px; }
   .enf-chip { display:inline-block; font-size:10px; margin-top:3px; margin-right:4px; padding:1px 6px; border-radius:8px; }
   .enf-chip.none { display:none; } .enf-chip.active { background:#fee2e2; color:#991b1b; } .enf-chip.done { background:#d1fae5; color:#065f46; }
+  .cert-box { border:1px solid #d6bcfa; background:#faf5ff; border-radius:10px; padding:12px; margin-bottom:16px; }
+  .cert-item { background:white; border:1px solid #e9d8fd; border-radius:8px; padding:8px 10px; margin-bottom:8px; font-size:12px; }
+  .cert-item.soon { border-color:#f6ad55; } .cert-item.over { border-color:#fc8181; }
+  .cert-state { font-size:11px; padding:1px 8px; border-radius:10px; font-weight:600; margin-left:4px; }
+  .cert-state.ok { background:#d1fae5; color:#065f46; } .cert-state.soon { background:#feebc8; color:#9c4221; } .cert-state.over { background:#fee2e2; color:#991b1b; } .cert-state.none { background:#edf2f7; color:#718096; }
   .upcoming { background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px 14px; margin-bottom:12px; }
   .upcoming-row { display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; padding:4px 0; border-top:1px dashed #fde68a; font-size:13px; cursor:pointer; }
   .upcoming-row:hover { background:#fef3c7; }
@@ -427,6 +432,14 @@
           <p style="margin-top:8px;">兩邊互不影響：可以同時進行，也可以一邊已終結、另一邊還在執行。進度選「終結」或「撤回」的標的視為結束。</p>
         </div>
 
+        <h4 style="font-size:13px;font-weight:700;margin-bottom:8px;color:#44337a;">📜 債權憑證效期與舊案</h4>
+        <div style="background:#faf5ff;border:1px solid #d6bcfa;border-radius:8px;padding:14px 16px;margin-bottom:20px;font-size:13px;">
+          <p>・ 在案件「詳情」的「📜 債權憑證效期」新增憑證：核發法院、字號、核發日、執行名義。系統依執行名義預設時效年數（本票裁定 3 年；確定判決、確定支付命令、和解／調解筆錄 5 年，可修改），自動算出到期日。</p>
+          <p>・ 到期前 3 個月／6 個月（預設）／1 年開始出現在「📌 近期期日」，案件清單也會顯示「📜 憑證到期」日期。</p>
+          <p>・ 換發新憑證或持憑證再聲請強制執行後，按「🔄 已換發」填日期，時效從該日重新起算並留下紀錄。實際時效請以法務判斷為準。</p>
+          <p>・ 沒有案件編號、登記日期等資料的舊案，新增案件時勾選「舊案」：系統會給一個 OLD- 開頭的編號，登記日期可以留空。</p>
+        </div>
+
         <h4 style="font-size:13px;font-weight:700;margin-bottom:8px;color:#2d3748;">強制執行結束的兩種結果</h4>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
           <div style="background:#f0fff4;border:1px solid #c6f6d5;border-radius:8px;padding:12px 14px;font-size:13px;">
@@ -451,7 +464,7 @@
   <div class="modal">
     <div class="modal-title"><span id="modal-title-text">新增催收案件</span><button class="modal-close" onclick="closeModal('case-modal')">✕</button></div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">案件編號</label><input class="form-control" id="f-id" placeholder="自動生成或手動輸入" /></div>
+      <div class="form-group"><label class="form-label">案件編號 <label style="font-weight:400;font-size:11px;margin-left:8px;cursor:pointer;"><input type="checkbox" id="f-legacy" onchange="onLegacyToggle()"> 舊案（沒有案件編號、登記日期等資料）</label></label><input class="form-control" id="f-id" placeholder="自動生成或手動輸入" /></div>
       <div class="form-group"><label class="form-label">登記日期</label><input class="form-control" type="date" id="f-date" onchange="document.getElementById('f-days-display').value=this.value?calcDays(this.value)+' 天':''" /></div>
     </div>
     <!-- 借款人類型 -->
@@ -673,6 +686,57 @@
   </div>
 </div>
 
+<!-- 債權憑證 Modal -->
+<div class="modal-overlay" id="cert-modal">
+  <div class="modal" style="width:560px;">
+    <div class="modal-title"><span id="cert-modal-title">債權憑證</span><button class="modal-close" onclick="closeCertModal()">✕</button></div>
+    <input type="hidden" id="cert-id" /><input type="hidden" id="cert-case" />
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">核發法院</label><input class="form-control" id="cert-court" placeholder="例：臺灣臺南地方法院" /></div>
+      <div class="form-group"><label class="form-label">債權憑證字號</label><input class="form-control" id="cert-no" placeholder="例：115年度司執字第27813號" /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">核發日期</label><input class="form-control" type="date" id="cert-issue" oninput="updateCertPreview()" /></div>
+      <div class="form-group"><label class="form-label">執行名義</label><select class="form-control" id="cert-basis" onchange="onCertBasisChange()"></select></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">時效年數</label><input class="form-control" type="number" id="cert-years" min="1" max="15" oninput="updateCertPreview()" /></div>
+      <div class="form-group"><label class="form-label">提前提醒</label><select class="form-control" id="cert-remind" onchange="updateCertPreview()"><option value="90">3 個月前</option><option value="180">6 個月前</option><option value="365">1 年前</option></select></div>
+    </div>
+    <div class="form-group"><label class="form-label">最近一次重新起算日（選填；再執行等中斷時效後的日期，未填則以核發日計算）</label><input class="form-control" type="date" id="cert-interrupt" oninput="updateCertPreview()" /></div>
+    <div id="cert-preview" style="background:#faf5ff;border:1px solid #d6bcfa;border-radius:8px;padding:8px 12px;font-size:12px;color:#553c9a;margin-bottom:12px;"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">債務人</label><input class="form-control" id="cert-debtors" /></div>
+      <div class="form-group"><label class="form-label">憑證金額（元，選填）</label><input class="form-control" type="number" id="cert-amount" /></div>
+    </div>
+    <div class="form-group"><label class="form-label">備註</label><input class="form-control" id="cert-notes" /></div>
+    <div style="font-size:11px;color:#718096;margin-bottom:8px;">預設年數：本票裁定 3 年；確定判決、確定支付命令、和解／調解筆錄 5 年。實際時效請以法務判斷為準，可直接修改年數。</div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeCertModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveCert()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 債權憑證換發 Modal -->
+<div class="modal-overlay" id="cert-renew-modal">
+  <div class="modal" style="width:480px;">
+    <div class="modal-title"><span>🔄 債權憑證換發／重新起算</span><button class="modal-close" onclick="closeCertRenew()">✕</button></div>
+    <input type="hidden" id="renew-id" />
+    <div id="renew-info" style="background:#f7fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">方式</label><select class="form-control" id="renew-way"></select></div>
+      <div class="form-group"><label class="form-label">日期（新憑證核發日／聲請日）</label><input class="form-control" type="date" id="renew-date" /></div>
+    </div>
+    <div class="form-group"><label class="form-label">新字號（選填）</label><input class="form-control" id="renew-no" /></div>
+    <div class="form-group"><label class="form-label">備註</label><input class="form-control" id="renew-note" placeholder="例：委託事務所聲請換發" /></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeCertRenew()">取消</button>
+      <button class="btn btn-success" onclick="saveCertRenew()">確認</button>
+    </div>
+  </div>
+</div>
+
 <!-- 代墊費用 Modal -->
 <div class="modal-overlay" id="fee-modal">
   <div class="modal" style="width:500px;">
@@ -847,6 +911,7 @@ const REVIEWS_KEY    = 'bznk_reviews_v1';
 const RECOVERIES_KEY = 'bznk_recoveries_v1';
 const OFFSETS_KEY    = 'bznk_offsets_v1';
 const ENFORCE_KEY    = 'bznk_enforcements_v1';
+const CERTS_KEY      = 'bznk_certs_v1';
 
 // ── 資料存取：本機（localStorage）或共用資料庫（Firestore）──────────
 // 預設使用共用資料庫；網址加 ?cloud=0 切回本機資料（會記住），?cloud=1 恢復共用資料庫
@@ -854,8 +919,8 @@ const ENFORCE_KEY    = 'bznk_enforcements_v1';
   if(p==='1') localStorage.setItem('bznk_cloud_mode','1');
   if(p==='0') localStorage.setItem('bznk_cloud_mode','0'); }catch(e){} })();
 const CLOUD_MODE = (()=>{ try{ return localStorage.getItem('bznk_cloud_mode')!=='0'; }catch(e){ return true; } })();
-const STORES = { cases:CASES_KEY, fees:FEES_KEY, reviews:REVIEWS_KEY, recoveries:RECOVERIES_KEY, offsets:OFFSETS_KEY, enforcements:ENFORCE_KEY };
-const _cloud = { ready:false, data:{ cases:[], fees:[], reviews:[], recoveries:[], offsets:[], enforcements:[], settings:{} } };
+const STORES = { cases:CASES_KEY, fees:FEES_KEY, reviews:REVIEWS_KEY, recoveries:RECOVERIES_KEY, offsets:OFFSETS_KEY, enforcements:ENFORCE_KEY, certs:CERTS_KEY };
+const _cloud = { ready:false, data:{ cases:[], fees:[], reviews:[], recoveries:[], offsets:[], enforcements:[], certs:[], settings:{} } };
 function localLoad(key, def) { try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(def)); } catch(e) { return def; } }
 function stableStr(v) {
   if (Array.isArray(v)) return '['+v.map(stableStr).join(',')+']';
@@ -958,6 +1023,8 @@ function loadOffsets()      { return storeLoad('offsets'); }
 function saveOffsets(d)     { storeSave('offsets', d); }
 function loadEnforcements() { return storeLoad('enforcements'); }
 function saveEnforcements(d){ storeSave('enforcements', d); }
+function loadCerts()        { return storeLoad('certs'); }
+function saveCerts(d)       { storeSave('certs', d); }
 
 function caseRecoverySummary(caseId) {
   const recs = loadRecoveries().filter(r=>r.caseId===caseId);
@@ -1126,10 +1193,10 @@ function renderTable() {
     const certCount = isCert ? reviews.filter(r=>r.caseId===c.id).length : 0;
     const rowBg = isCert ? 'background:#faf5ff;' : '';
     return `<tr style="border-bottom:1px solid #f0f4f8;${rowBg}">
-      <td style="padding:10px 12px;font-size:12px;font-family:monospace;color:#4a5568;">${c.id}</td>
+      <td style="padding:10px 12px;font-size:12px;font-family:monospace;color:#4a5568;">${c.id}${c.legacy?'<br><span class="enf-chip done" style="background:#edf2f7;color:#4a5568;">舊案</span>':''}</td>
       <td style="padding:10px 12px;font-weight:600;">${c.name} <span class="badge badge-${c.borrowerType||'自然人'}" style="font-size:10px;">${c.borrowerType==='法人'?'法人':'自然人'}</span>${isCert?` <span style="font-size:10px;color:#6b46c1;font-weight:600;">📅${certCount}次</span>`:''}</td>
-      <td style="padding:10px 12px;color:#c53030;font-weight:600;">${fmtM(c.amount)}${c.interest?`<span style='font-size:10px;color:#718096;'>+息${fmtM(c.interest)}</span>`:''}<br><span style='font-size:11px;color:#718096;font-weight:400;'>逾期 ${calcDays(c.date)} 天｜餘${fmtM(c.amount-caseRecoverySummary(c.id).recovered)}</span></td>
-      <td style="padding:10px 12px;"><span class="badge badge-${c.stage}">${c.stage}</span>${Object.keys(ENF_TRACKS).map(t=>{const st=enfTrackState(c.id,t);return `<br><span class="enf-chip ${st.cls}">${ENF_TRACKS[t].icon}${t} ${st.label}</span>`;}).join('')}</td>
+      <td style="padding:10px 12px;color:#c53030;font-weight:600;">${fmtM(c.amount)}${c.interest?`<span style='font-size:10px;color:#718096;'>+息${fmtM(c.interest)}</span>`:''}<br><span style='font-size:11px;color:#718096;font-weight:400;'>${c.date?`逾期 ${calcDays(c.date)} 天`:'逾期天數 —'}｜餘${fmtM(c.amount-caseRecoverySummary(c.id).recovered)}</span></td>
+      <td style="padding:10px 12px;"><span class="badge badge-${c.stage}">${c.stage}</span>${Object.keys(ENF_TRACKS).map(t=>{const st=enfTrackState(c.id,t);return `<br><span class="enf-chip ${st.cls}">${ENF_TRACKS[t].icon}${t} ${st.label}</span>`;}).join('')}${(()=>{const cs=loadCerts().filter(x=>x.caseId===c.id).map(certState).filter(s=>s.exp).sort((a,b)=>a.exp.localeCompare(b.exp));if(!cs.length)return '';const s0=cs[0];return `<br><span class="enf-chip ${s0.cls==='ok'?'done':'active'}">📜 憑證到期 ${s0.exp}</span>`;})()}</td>
       <td style="padding:10px 12px;font-size:12px;color:#4a5568;">${c.lawyer||'—'}</td>
       <td style="padding:10px 12px;font-size:12px;color:#4a5568;">${c.court||'—'}</td>
       <td style="padding:10px 12px;font-size:12px;color:#c53030;font-weight:600;">${totalOut>0?fmtM(totalOut):'—'}</td>
@@ -1456,6 +1523,7 @@ function openAddCase() {
   editingId=null;
   document.getElementById('modal-title-text').textContent='新增催收案件';
   document.getElementById('f-id').value=genId();
+  document.getElementById('f-legacy').checked=false;
   document.getElementById('f-date').value=today();
   ['f-name','f-idno','f-note-amount','f-amount','f-interest','f-court','f-lawyer','f-casenumber','f-gdlink','f-notes'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-days-display').value='';
@@ -1471,6 +1539,7 @@ function editCase(id) {
   editingId=id;
   document.getElementById('modal-title-text').textContent='編輯催收案件';
   document.getElementById('f-id').value=c.id; document.getElementById('f-date').value=c.date;
+  document.getElementById('f-legacy').checked=!!c.legacy;
   document.getElementById('f-name').value=c.name; document.getElementById('f-idno').value=c.idno||'';
   document.getElementById('f-note-amount').value=c.noteAmount||''; document.getElementById('f-amount').value=c.amount; document.getElementById('f-interest').value=c.interest||'';
   document.getElementById('f-days-display').value=calcDays(c.date)+' 天';
@@ -1484,6 +1553,14 @@ function editCase(id) {
   loadCourtFields(c);
   renderGuarantorForm(c.guarantors||[]);
   openModal('case-modal');
+}
+function legacyId(){ const d=today().replace(/-/g,'').slice(2); return `OLD-${d}-${String(Math.floor(Math.random()*9000)+1000)}`; }
+function onLegacyToggle(){
+  const on=document.getElementById('f-legacy').checked, idEl=document.getElementById('f-id');
+  if(!editingId){
+    if(on && /^CC\d{4}-\d{4}$/.test(idEl.value)) { idEl.value=legacyId(); document.getElementById('f-date').value=''; document.getElementById('f-days-display').value=''; }
+    if(!on && /^OLD-/.test(idEl.value)) { idEl.value=genId(); document.getElementById('f-date').value=today(); }
+  }
 }
 function saveCase() {
   const borrowerType=document.querySelector('input[name="f-btype"]:checked').value;
@@ -1503,15 +1580,17 @@ function saveCase() {
     stage:document.getElementById('f-stage').value, court:document.getElementById('f-court').value.trim(),
     lawyer:document.getElementById('f-lawyer').value.trim(), casenumber:document.getElementById('f-casenumber').value.trim(),
     gdlink:document.getElementById('f-gdlink').value.trim(), notes:document.getElementById('f-notes').value.trim(),
+    legacy:document.getElementById('f-legacy').checked,
   };
-  if (!data.id||!data.name||!data.date) { alert('請填寫案件編號、借款人姓名和日期'); return; }
+  if (data.legacy && !data.id) data.id=legacyId();
+  if (!data.id||!data.name||(!data.date&&!data.legacy)) { alert(data.legacy?'請填寫借款人姓名':'請填寫案件編號、借款人姓名和日期（沒有這些資料的舊案，請勾選「舊案」）'); return; }
   let cases=loadCases();
   if (editingId) { cases=cases.map(c=>c.id===editingId?data:c); }
   else { if(cases.find(c=>c.id===data.id)){alert('案件編號已存在');return;} cases.push(data); }
   saveCases(cases); closeModal('case-modal'); refresh();
 }
 function deleteCase(id) {
-  if(!confirm(`確定要刪除案件 ${id}？\n相關費用、收款記錄、年度調閱記錄、強制執行明細也會一併刪除。`)) return;
+  if(!confirm(`確定要刪除案件 ${id}？\n相關費用、收款記錄、年度調閱記錄、強制執行明細、債權憑證也會一併刪除。`)) return;
   const cFees = loadFees().filter(f=>f.caseId===id).map(f=>f.id);
   saveCases(loadCases().filter(c=>c.id!==id));
   saveFees(loadFees().filter(f=>f.caseId!==id));
@@ -1519,6 +1598,7 @@ function deleteCase(id) {
   saveRecoveries(loadRecoveries().filter(r=>r.caseId!==id));
   saveOffsets(loadOffsets().filter(o=>o.caseId!==id));
   saveEnforcements(loadEnforcements().filter(e=>e.caseId!==id));
+  saveCerts(loadCerts().filter(x=>x.caseId!==id));
   refresh();
 }
 
@@ -1575,7 +1655,7 @@ function viewDetail(id) {
       </div>
       <div class="detail-item"><div class="label">${c.borrowerType==='法人'?'統一編號':'身分證字號'}</div><div class="value" style="font-family:monospace;">${c.idno||'—'}</div></div>
       <div class="detail-item"><div class="label">本票金額</div><div class="value" style="color:#6b21a8;">${c.noteAmount?fmtMoney(c.noteAmount):'<span style=\'color:#a0aec0;\'>未設定</span>'}</div></div>
-      <div class="detail-item"><div class="label">逾期本金</div><div class="value" style="color:#c53030;">${fmtMoney(c.amount)}<span style="font-size:12px;color:#718096;font-weight:400;margin-left:8px;">逾期 ${calcDays(c.date)} 天</span></div></div>
+      <div class="detail-item"><div class="label">逾期本金</div><div class="value" style="color:#c53030;">${fmtMoney(c.amount)}<span style="font-size:12px;color:#718096;font-weight:400;margin-left:8px;">${c.date?`逾期 ${calcDays(c.date)} 天`:(c.legacy?'舊案，無登記日期':'')}</span></div></div>
       <div class="detail-item"><div class="label">利息金額</div><div class="value" style="color:#c05621;">${c.interest?fmtMoney(c.interest):'<span style=\'color:#a0aec0;\'>未設定</span>'}</div></div>
       <div class="detail-item"><div class="label">催收階段</div><div class="value"><span class="badge badge-${c.stage}">${c.stage}</span></div></div>
       <div class="detail-item"><div class="label">管轄法院</div><div class="value">${c.court||'—'}</div></div>
@@ -1617,6 +1697,7 @@ function viewDetail(id) {
       </table>`:''}`;
     })()}
     ${renderEnfSection(c)}
+    ${renderCertSection(c)}
     ${c.gdlink?`<div class="gd-note" style="justify-content:space-between;">
       <span>📂 <a href="${c.gdlink}" target="_blank" style="color:#2b6cb0;font-weight:600;">開啟 Google Drive 法院文件資料夾</a></span>
       <button class="btn btn-outline btn-sm" onclick="syncDriveFiles('${c.id}','${c.gdlink}')" style="font-size:12px;">🔄 同步文件清單</button>
@@ -1841,6 +1922,18 @@ function importEnforcementsFile(input){
     try{ data=JSON.parse(reader.result); }catch(e){ alert('檔案格式錯誤，無法讀取（需為匯入用的 JSON 檔）'); return; }
     const incoming=Array.isArray(data)?data:(data.items||[]);
     const cases=loadCases(), existing=loadEnforcements();
+    // 案件（通常是舊案）：同編號或同借款人名稱已存在就略過，新增的案件可供同檔其他資料使用
+    const addCases=[], dupCases=[];
+    (Array.isArray(data)?[]:(data.cases||[])).forEach(c=>{
+      const name=String((c&&c.name)||'').trim();
+      if(!name){ return; }
+      if(cases.some(x=>x.id===c.id||String(x.name||'').trim()===name)){ dupCases.push(name); return; }
+      const rec={id:c.id||legacyId(), date:c.date||'', name, idno:c.idno||'', borrowerType:c.borrowerType==='法人'?'法人':(c.borrowerType||'法人'),
+        guarantors:Array.isArray(c.guarantors)?c.guarantors:[], amount:Number(c.amount)||0, interest:Number(c.interest)||0,
+        stage:ALL_STAGES.includes(c.stage)?c.stage:'債權憑證', court:c.court||'', lawyer:c.lawyer||'', casenumber:c.casenumber||'',
+        gdlink:c.gdlink||'', notes:c.notes||'', legacy:c.legacy!==false};
+      cases.push(rec); addCases.push(rec);
+    });
     const key=e=>`${e.caseId}|${e.track}|${String(e.target||'').trim()}`;
     const have=new Set(existing.map(key));
     const add=[], dup=[], noCase=new Set(), bad=[];
@@ -1885,24 +1978,162 @@ function importEnforcementsFile(input){
       if(!fee){ bad.push('(沖銷對不到費用)'); return; }
       offIds.add(o.id); addOffs.push({id:o.id||uid('O'), feeId:o.feeId, caseId:fee.caseId, date:o.date||today(), amount:Number(o.amount), notes:o.notes||''});
     });
+    // 債權憑證：同 id，或同案件＋同字號，視為已存在
+    const exCerts=loadCerts(); const certKey=x=>`${x.caseId}|${String(x.certNo||'').trim()}`;
+    const certIds=new Set(exCerts.map(x=>x.id)), certKeys=new Set(exCerts.filter(x=>x.certNo).map(certKey));
+    const addCerts=[], dupCerts=[];
+    (Array.isArray(data)?[]:(data.certs||[])).forEach(x=>{
+      if(!x||!x.caseId||!x.issueDate){ bad.push((x&&x.certNo)||'(債權憑證)'); return; }
+      if(!cases.some(c=>c.id===x.caseId)){ noCase.add(x.caseId); return; }
+      if((x.id&&certIds.has(x.id))||(x.certNo&&certKeys.has(certKey(x)))){ dupCerts.push(x); return; }
+      const basis=CERT_BASIS[x.basis]?x.basis:'其他';
+      const rec={id:x.id||uid('C'), caseId:x.caseId, court:x.court||'', certNo:x.certNo||'', issueDate:x.issueDate, basis,
+        years:Number(x.years)||CERT_BASIS[basis], interruptDate:x.interruptDate||x.issueDate, remindDays:Number(x.remindDays)||180,
+        debtors:x.debtors||'', amount:Number(x.amount)||0, notes:x.notes||'',
+        logs:[...(x.logs||[]).filter(l=>l&&l.text).map(l=>({id:uid('L'),date:l.date||today(),text:String(l.text)})),{id:uid('L'),date:today(),text:'由匯入檔建立'}]};
+      certIds.add(rec.id); if(rec.certNo) certKeys.add(certKey(rec)); addCerts.push(rec);
+    });
     const lines=[];
+    if(addCases.length) lines.push(`將新增 ${addCases.length} 件案件（舊案）：${addCases.map(c=>c.name).join('、')}`);
+    if(dupCases.length) lines.push(`略過 ${dupCases.length} 件案件（系統已有同名或同編號）`);
     if(incoming.length) lines.push(`將新增 ${add.length} 筆執行標的`);
     if(addFees.length||dupFees.length) lines.push(`將新增 ${addFees.length} 筆代墊費用（合計 ${addFees.reduce((s,f)=>s+f.amount,0).toLocaleString('zh-TW')} 元）`);
     if(addOffs.length||dupOffs.length) lines.push(`將新增 ${addOffs.length} 筆費用沖銷`);
+    if(addCerts.length||dupCerts.length) lines.push(`將新增 ${addCerts.length} 筆債權憑證`);
+    if(dupCerts.length) lines.push(`略過 ${dupCerts.length} 筆債權憑證（系統已有）`);
     if(dup.length) lines.push(`略過 ${dup.length} 筆執行標的（系統已有相同標的）`);
     if(dupFees.length) lines.push(`略過 ${dupFees.length} 筆代墊費用（系統已有）`);
     if(dupOffs.length) lines.push(`略過 ${dupOffs.length} 筆費用沖銷（系統已有）`);
     if(noCase.size) lines.push(`略過 ${[...noCase].length} 個系統內找不到的案件：${[...noCase].join('、')}`);
     if(bad.length) lines.push(`略過 ${bad.length} 筆格式不完整的資料`);
-    if(!add.length&&!addFees.length&&!addOffs.length){ alert(lines.join('\n')||'檔案裡沒有可以匯入的資料'); return; }
+    if(!addCases.length&&!add.length&&!addFees.length&&!addOffs.length&&!addCerts.length){ alert(lines.join('\n')||'檔案裡沒有可以匯入的資料'); return; }
     if(!confirm(lines.join('\n')+'\n\n只會新增，不會修改或刪除現有資料。確定匯入？')) return;
+    if(addCases.length) saveCases([...loadCases(),...addCases]);
     if(add.length) saveEnforcements([...existing,...add]);
     if(addFees.length) saveFees([...exFees,...addFees]);
     if(addOffs.length) saveOffsets([...exOffs,...addOffs]);
+    if(addCerts.length) saveCerts([...exCerts,...addCerts]);
     refresh();
-    alert(`已匯入：執行標的 ${add.length} 筆、代墊費用 ${addFees.length} 筆、費用沖銷 ${addOffs.length} 筆。`);
+    alert(`已匯入：案件 ${addCases.length} 件、執行標的 ${add.length} 筆、代墊費用 ${addFees.length} 筆、費用沖銷 ${addOffs.length} 筆、債權憑證 ${addCerts.length} 筆。`);
   };
   reader.readAsText(file,'utf-8');
+}
+// ── 債權憑證效期追蹤 ─────────────────────────────
+// 時效年數預設：本票債權 3 年（票據法第22條）；確定判決、確定支付命令、和解／調解筆錄 5 年（民法第137條第3項）。實際以法務判斷為準。
+const CERT_BASIS = { '本票裁定':3, '確定判決':5, '支付命令（確定）':5, '和解／調解筆錄':5, '其他':5 };
+const CERT_RENEW_WAYS = ['換發新債權憑證','持憑證再聲請強制執行','其他中斷時效事由'];
+function addYears(dateStr, n){ const d=new Date(dateStr+'T00:00:00'); d.setFullYear(d.getFullYear()+Number(n||0)); return d.toISOString().slice(0,10); }
+function certBaseDate(x){ return x.interruptDate||x.issueDate||''; }
+function certExpiry(x){ const b=certBaseDate(x); return b?addYears(b, x.years||CERT_BASIS[x.basis]||5):''; }
+function certState(x){
+  const exp=certExpiry(x); if(!exp) return {cls:'none',label:'未填日期',d:null,exp};
+  const d=daysFromToday(exp), remind=Number(x.remindDays||180);
+  if(d<0) return {cls:'over',label:`已逾期 ${-d} 天`,d,exp};
+  if(d<=remind) return {cls:'soon',label:`還有 ${d} 天到期`,d,exp};
+  return {cls:'ok',label:'有效',d,exp};
+}
+function renderCertSection(c){
+  const certs=loadCerts().filter(x=>x.caseId===c.id).sort((a,b)=>(certExpiry(a)||'9').localeCompare(certExpiry(b)||'9'));
+  const items=certs.map(x=>{
+    const st=certState(x);
+    const logs=(x.logs||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
+    return `<div class="cert-item ${st.cls}">
+      <div style="display:flex;justify-content:space-between;gap:6px;align-items:flex-start;">
+        <div><b>${escH(x.certNo||'（未填字號）')}</b> <span class="cert-state ${st.cls}">${st.label}</span></div>
+        <div style="display:flex;gap:4px;flex-shrink:0;">
+          <button class="btn btn-success btn-sm" onclick="openCertRenew('${x.id}')">🔄 已換發</button>
+          <button class="btn btn-outline btn-sm" onclick="openCertModal('${c.id}','${x.id}')">更新</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteCert('${x.id}')">刪除</button>
+        </div>
+      </div>
+      <div class="enf-meta">${escH(x.court||'—')}｜依據：${escH(x.basis||'—')}（${x.years||CERT_BASIS[x.basis]||5} 年）｜債務人：${escH(x.debtors||'—')}${x.amount?`｜憑證金額 ${fmtM(x.amount)}`:''}</div>
+      <div>核發日 ${x.issueDate||'—'}${x.interruptDate&&x.interruptDate!==x.issueDate?`｜最近重新起算 ${x.interruptDate}`:''}｜<b>時效到期 ${st.exp||'—'}</b>｜提前 ${x.remindDays||180} 天提醒</div>
+      ${x.notes?`<div class="enf-meta">備註：${escH(x.notes)}</div>`:''}
+      ${logs.length?`<details><summary style="cursor:pointer;color:#718096;margin-top:4px;">紀錄（${logs.length}）</summary><ul class="enf-log">${logs.map(l=>`<li><b>${l.date}</b>${escH(l.text)}</li>`).join('')}</ul></details>`:''}
+    </div>`;
+  }).join('');
+  return `<div class="cert-box"><div class="enf-head"><span>📜 債權憑證效期（${certs.length}）</span>
+    <button class="btn btn-outline btn-sm" onclick="openCertModal('${c.id}')">＋ 新增債權憑證</button></div>
+    ${items||'<div style="text-align:center;color:#a0aec0;padding:10px;font-size:12px;">尚無債權憑證紀錄</div>'}</div>`;
+}
+function openCertModal(caseId, id=''){
+  const c=loadCases().find(x=>x.id===caseId); if(!c) return;
+  const x=id?loadCerts().find(y=>y.id===id):null;
+  closeModal('detail-modal');
+  document.getElementById('cert-modal-title').textContent=`📜 ${x?'更新':'新增'}債權憑證｜${c.name}`;
+  document.getElementById('cert-id').value=id; document.getElementById('cert-case').value=caseId;
+  document.getElementById('cert-basis').innerHTML=Object.keys(CERT_BASIS).map(b=>`<option ${x&&x.basis===b?'selected':''}>${b}</option>`).join('');
+  document.getElementById('cert-court').value=x?x.court||'':(c.court||'');
+  document.getElementById('cert-no').value=x?x.certNo||'':'';
+  document.getElementById('cert-issue').value=x?x.issueDate||'':'';
+  document.getElementById('cert-years').value=x?(x.years||CERT_BASIS[x.basis]||5):CERT_BASIS['本票裁定'];
+  document.getElementById('cert-interrupt').value=x?(x.interruptDate&&x.interruptDate!==x.issueDate?x.interruptDate:''):'';
+  document.getElementById('cert-remind').value=String(x?x.remindDays||180:180);
+  document.getElementById('cert-debtors').value=x?x.debtors||'':[c.name,...(c.guarantors||[]).map(g=>g.name)].filter(Boolean).join('、');
+  document.getElementById('cert-amount').value=x&&x.amount?x.amount:'';
+  document.getElementById('cert-notes').value=x?x.notes||'':'';
+  updateCertPreview();
+  openModal('cert-modal');
+}
+function onCertBasisChange(){ document.getElementById('cert-years').value=CERT_BASIS[document.getElementById('cert-basis').value]||5; updateCertPreview(); }
+function updateCertPreview(){
+  const x={issueDate:document.getElementById('cert-issue').value, interruptDate:document.getElementById('cert-interrupt').value,
+    years:Number(document.getElementById('cert-years').value)||5, remindDays:Number(document.getElementById('cert-remind').value)||180};
+  const st=certState(x);
+  document.getElementById('cert-preview').textContent=st.exp?`時效到期日：${st.exp}（${st.label}），${x.remindDays} 天前開始出現在「近期期日」`:'填入核發日後會自動計算到期日';
+}
+function closeCertModal(){ const cid=document.getElementById('cert-case').value; closeModal('cert-modal'); if(cid) viewDetail(cid); }
+function saveCert(){
+  const id=document.getElementById('cert-id').value, caseId=document.getElementById('cert-case').value;
+  const issueDate=document.getElementById('cert-issue').value;
+  if(!issueDate){ alert('請填寫債權憑證核發日期'); return; }
+  const list=loadCerts(); const old=id?list.find(x=>x.id===id):null;
+  const data={ id:id||uid('C'), caseId,
+    court:document.getElementById('cert-court').value.trim(), certNo:document.getElementById('cert-no').value.trim(),
+    issueDate, basis:document.getElementById('cert-basis').value, years:Number(document.getElementById('cert-years').value)||5,
+    interruptDate:document.getElementById('cert-interrupt').value||issueDate,
+    remindDays:Number(document.getElementById('cert-remind').value)||180,
+    debtors:document.getElementById('cert-debtors').value.trim(), amount:Number(document.getElementById('cert-amount').value)||0,
+    notes:document.getElementById('cert-notes').value.trim(), logs:old?(old.logs||[]).slice():[] };
+  if(!old) data.logs.push({id:uid('L'),date:today(),text:`建立債權憑證紀錄，時效到期 ${certExpiry(data)}`});
+  else if(certExpiry(old)!==certExpiry(data)) data.logs.push({id:uid('L'),date:today(),text:`到期日由 ${certExpiry(old)} 改為 ${certExpiry(data)}`});
+  saveCerts(old?list.map(x=>x.id===id?data:x):[...list,data]);
+  closeModal('cert-modal'); refresh(); viewDetail(caseId);
+}
+function deleteCert(id){
+  const x=loadCerts().find(y=>y.id===id); if(!x) return;
+  if(!confirm(`確定刪除債權憑證「${x.certNo||'未填字號'}」的紀錄？`)) return;
+  saveCerts(loadCerts().filter(y=>y.id!==id)); refresh(); viewDetail(x.caseId);
+}
+function openCertRenew(id){
+  const x=loadCerts().find(y=>y.id===id); if(!x) return;
+  window._renewReturnToDetail=document.getElementById('detail-modal').classList.contains('active');
+  closeModal('detail-modal');
+  document.getElementById('renew-id').value=id;
+  document.getElementById('renew-info').innerHTML=`<b>${escH(x.certNo||'（未填字號）')}</b>｜${escH(x.court||'')}<br>目前時效到期：${certExpiry(x)||'—'}`;
+  document.getElementById('renew-way').innerHTML=CERT_RENEW_WAYS.map(w=>`<option>${w}</option>`).join('');
+  document.getElementById('renew-date').value=today();
+  document.getElementById('renew-no').value='';
+  document.getElementById('renew-note').value='';
+  openModal('cert-renew-modal');
+}
+function closeCertRenew(){
+  closeModal('cert-renew-modal');
+  const x=loadCerts().find(y=>y.id===document.getElementById('renew-id').value);
+  if(window._renewReturnToDetail&&x) viewDetail(x.caseId);
+}
+function saveCertRenew(){
+  const id=document.getElementById('renew-id').value, date=document.getElementById('renew-date').value;
+  if(!date){ alert('請填寫日期（新憑證核發日或聲請日）'); return; }
+  const way=document.getElementById('renew-way').value, no=document.getElementById('renew-no').value.trim(), note=document.getElementById('renew-note').value.trim();
+  const list=loadCerts().map(x=>{
+    if(x.id!==id) return x;
+    const y={...x, interruptDate:date, certNo:no||x.certNo, logs:[...(x.logs||[])]};
+    if(way==='換發新債權憑證') y.issueDate=date;
+    y.logs.push({id:uid('L'),date,text:`🔄 ${way}${no?'，新字號 '+no:''}，時效重新起算，新到期日 ${certExpiry(y)}${note?'｜'+note:''}`});
+    return y;
+  });
+  saveCerts(list); refresh(); closeCertRenew();
 }
 function renderUpcoming(){
   const panel=document.getElementById('upcoming-panel'); if(!panel) return;
@@ -1912,14 +2143,21 @@ function renderUpcoming(){
     const c=cases.find(c=>c.id===e.caseId); if(!c) return;
     openDeadlines(e).forEach(dl=>{ const d=daysFromToday(dl.date); if(d<=30) rows.push({e,c,dl,d}); });
   });
+  loadCerts().forEach(x=>{
+    const c=cases.find(c=>c.id===x.caseId); if(!c) return;
+    const st=certState(x); if(st.d===null||(st.cls!=='soon'&&st.cls!=='over')) return;
+    rows.push({cert:x,c,d:st.d,dl:{date:st.exp}});
+  });
   rows.sort((a,b)=>a.dl.date.localeCompare(b.dl.date));
   if(!rows.length){ panel.innerHTML=''; return; }
-  panel.innerHTML=`<div class="upcoming"><div style="font-weight:700;font-size:13px;color:#92400e;margin-bottom:4px;">📌 近期期日（30 天內）</div>
-    ${rows.map(({e,c,dl,d})=>`<div class="upcoming-row ${d<0?'overdue':''}" onclick="viewDetail('${c.id}')">
+  panel.innerHTML=`<div class="upcoming"><div style="font-weight:700;font-size:13px;color:#92400e;margin-bottom:4px;">📌 近期期日（30 天內；債權憑證依各自提醒天數）</div>
+    ${rows.map(({e,cert,c,dl,d})=>`<div class="upcoming-row ${d<0?'overdue':''}" onclick="viewDetail('${c.id}')">
       <span class="upcoming-date">${dl.date}</span>
       <span style="min-width:74px;color:${d<0?'#c53030':'#718096'};font-size:12px;">${d<0?`已過 ${-d} 天`:d===0?'今天':`還有 ${d} 天`}</span>
-      <span style="flex:1;"><b>${escH(c.name)}</b>｜${ENF_TRACKS[e.track]?ENF_TRACKS[e.track].icon:''} ${escH(e.target)}｜${escH(dl.note)}</span>
-      <button class="btn btn-success btn-sm" onclick="event.stopPropagation();openDoneModal('${e.id}','${dl.id}')">✔ 完成</button>
+      ${cert?`<span style="flex:1;"><b>${escH(c.name)}</b>｜📜 債權憑證時效到期，請聲請換發｜${escH(cert.certNo||'未填字號')}</span>
+      <button class="btn btn-success btn-sm" onclick="event.stopPropagation();openCertRenew('${cert.id}')">🔄 已換發</button>`
+      :`<span style="flex:1;"><b>${escH(c.name)}</b>｜${ENF_TRACKS[e.track]?ENF_TRACKS[e.track].icon:''} ${escH(e.target)}｜${escH(dl.note)}</span>
+      <button class="btn btn-success btn-sm" onclick="event.stopPropagation();openDoneModal('${e.id}','${dl.id}')">✔ 完成</button>`}
     </div>`).join('')}</div>`;
 }
 
@@ -3513,7 +3751,7 @@ const EXPORT_HASH_KEY='bznk_export_hash_v1';
 
 function calcDataHash() {
   // 把所有資料串在一起算 hash（簡單 checksum），本機與共用資料庫模式都適用
-  const raw = stableStr([loadCases(),loadFees(),loadReviews(),loadRecoveries(),loadOffsets(),loadEnforcements()]);
+  const raw = stableStr([loadCases(),loadFees(),loadReviews(),loadRecoveries(),loadOffsets(),loadEnforcements(),loadCerts()]);
   let h=0;
   for(let i=0;i<raw.length;i++){h=Math.imul(31,h)+raw.charCodeAt(i)|0;}
   return String(h>>>0);
@@ -3579,6 +3817,10 @@ function buildCsvContent() {
   recRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
   csv+='\n=== 強制執行明細 ===\n'+enfHeaders.map(esc).join(',')+'\n';
   enfRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
+  const certHeaders=['案件編號','借款人','核發法院','債權憑證字號','核發日期','執行名義','時效年數','最近重新起算日','時效到期日','狀態','債務人','憑證金額','備註','紀錄'];
+  csv+='\n=== 債權憑證效期 ===\n'+certHeaders.map(esc).join(',')+'\n';
+  loadCerts().forEach(x=>{ const c=cases.find(c=>c.id===x.caseId); const st=certState(x);
+    csv+=[x.caseId,c?c.name:'',x.court||'',x.certNo||'',x.issueDate||'',x.basis||'',x.years||'',x.interruptDate||'',st.exp||'',st.label,x.debtors||'',x.amount||0,x.notes||'',(x.logs||[]).map(l=>`${l.date} ${l.text}`).join('；')].map(esc).join(',')+'\n'; });
   csv+='\n=== 債權憑證年度調閱記錄 ===\n'+revHeaders.map(esc).join(',')+'\n';
   revRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
   return csv;
