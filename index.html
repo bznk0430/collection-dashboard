@@ -1922,6 +1922,18 @@ function importEnforcementsFile(input){
     try{ data=JSON.parse(reader.result); }catch(e){ alert('檔案格式錯誤，無法讀取（需為匯入用的 JSON 檔）'); return; }
     const incoming=Array.isArray(data)?data:(data.items||[]);
     const cases=loadCases(), existing=loadEnforcements();
+    // 案件（通常是舊案）：同編號或同借款人名稱已存在就略過，新增的案件可供同檔其他資料使用
+    const addCases=[], dupCases=[];
+    (Array.isArray(data)?[]:(data.cases||[])).forEach(c=>{
+      const name=String((c&&c.name)||'').trim();
+      if(!name){ return; }
+      if(cases.some(x=>x.id===c.id||String(x.name||'').trim()===name)){ dupCases.push(name); return; }
+      const rec={id:c.id||legacyId(), date:c.date||'', name, idno:c.idno||'', borrowerType:c.borrowerType==='法人'?'法人':(c.borrowerType||'法人'),
+        guarantors:Array.isArray(c.guarantors)?c.guarantors:[], amount:Number(c.amount)||0, interest:Number(c.interest)||0,
+        stage:ALL_STAGES.includes(c.stage)?c.stage:'債權憑證', court:c.court||'', lawyer:c.lawyer||'', casenumber:c.casenumber||'',
+        gdlink:c.gdlink||'', notes:c.notes||'', legacy:c.legacy!==false};
+      cases.push(rec); addCases.push(rec);
+    });
     const key=e=>`${e.caseId}|${e.track}|${String(e.target||'').trim()}`;
     const have=new Set(existing.map(key));
     const add=[], dup=[], noCase=new Set(), bad=[];
@@ -1982,6 +1994,8 @@ function importEnforcementsFile(input){
       certIds.add(rec.id); if(rec.certNo) certKeys.add(certKey(rec)); addCerts.push(rec);
     });
     const lines=[];
+    if(addCases.length) lines.push(`將新增 ${addCases.length} 件案件（舊案）：${addCases.map(c=>c.name).join('、')}`);
+    if(dupCases.length) lines.push(`略過 ${dupCases.length} 件案件（系統已有同名或同編號）`);
     if(incoming.length) lines.push(`將新增 ${add.length} 筆執行標的`);
     if(addFees.length||dupFees.length) lines.push(`將新增 ${addFees.length} 筆代墊費用（合計 ${addFees.reduce((s,f)=>s+f.amount,0).toLocaleString('zh-TW')} 元）`);
     if(addOffs.length||dupOffs.length) lines.push(`將新增 ${addOffs.length} 筆費用沖銷`);
@@ -1992,14 +2006,15 @@ function importEnforcementsFile(input){
     if(dupOffs.length) lines.push(`略過 ${dupOffs.length} 筆費用沖銷（系統已有）`);
     if(noCase.size) lines.push(`略過 ${[...noCase].length} 個系統內找不到的案件：${[...noCase].join('、')}`);
     if(bad.length) lines.push(`略過 ${bad.length} 筆格式不完整的資料`);
-    if(!add.length&&!addFees.length&&!addOffs.length&&!addCerts.length){ alert(lines.join('\n')||'檔案裡沒有可以匯入的資料'); return; }
+    if(!addCases.length&&!add.length&&!addFees.length&&!addOffs.length&&!addCerts.length){ alert(lines.join('\n')||'檔案裡沒有可以匯入的資料'); return; }
     if(!confirm(lines.join('\n')+'\n\n只會新增，不會修改或刪除現有資料。確定匯入？')) return;
+    if(addCases.length) saveCases([...loadCases(),...addCases]);
     if(add.length) saveEnforcements([...existing,...add]);
     if(addFees.length) saveFees([...exFees,...addFees]);
     if(addOffs.length) saveOffsets([...exOffs,...addOffs]);
     if(addCerts.length) saveCerts([...exCerts,...addCerts]);
     refresh();
-    alert(`已匯入：執行標的 ${add.length} 筆、代墊費用 ${addFees.length} 筆、費用沖銷 ${addOffs.length} 筆、債權憑證 ${addCerts.length} 筆。`);
+    alert(`已匯入：案件 ${addCases.length} 件、執行標的 ${add.length} 筆、代墊費用 ${addFees.length} 筆、費用沖銷 ${addOffs.length} 筆、債權憑證 ${addCerts.length} 筆。`);
   };
   reader.readAsText(file,'utf-8');
 }
