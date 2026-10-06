@@ -230,6 +230,7 @@
   .enf-log b { color:#2d3748; font-weight:600; margin-right:6px; }
   .enf-chip { display:inline-block; font-size:10px; margin-top:3px; margin-right:4px; padding:1px 6px; border-radius:8px; }
   .enf-chip.none { display:none; } .enf-chip.active { background:#fee2e2; color:#991b1b; } .enf-chip.done { background:#d1fae5; color:#065f46; }
+  .cred-chip { display:inline-block; background:#e9d8fd; color:#553c9a; font-size:11px; font-weight:600; padding:0 8px; border-radius:10px; margin-right:6px; }
   .cert-box { border:1px solid #d6bcfa; background:#faf5ff; border-radius:10px; padding:12px; margin-bottom:16px; }
   .cert-item { background:white; border:1px solid #e9d8fd; border-radius:8px; padding:8px 10px; margin-bottom:8px; font-size:12px; }
   .cert-item.soon { border-color:#f6ad55; } .cert-item.over { border-color:#fc8181; }
@@ -312,6 +313,7 @@
           <option>破產宣告</option><option>債權憑證</option><option>打呆帳</option><option>結案</option>
         </select>
         <select id="filter-court" onchange="renderTable()"><option value="">全部法院</option></select>
+        <select id="filter-creditor" onchange="renderTable()"><option value="">全部債權人</option><option>台灣聯合（本公司）</option><option>合經投資</option><option>柏克萊資產</option></select>
         <select id="sort-by" onchange="renderTable()">
           <option value="date-desc">依登記日（新→舊）</option>
           <option value="date-asc">依登記日（舊→新）</option>
@@ -425,6 +427,8 @@
           <p style="margin-bottom:8px;">在案件「詳情」的<strong>強制執行明細</strong>區塊，分成 🏠 不動產、💰 動產（存款、保險、薪資、應收帳款等）兩邊記錄，每一筆標的各自記錄：</p>
           <p>・ 標的、債務人、執行法院、執行案號</p>
           <p>・ 目前進度（例如查封、第1次拍賣、第三人陳報－無款、終結－已受償）與受償金額</p>
+          <p>・ 債權人：每筆標的和債權憑證可以標明債權屬於誰（台灣聯合本公司、合經投資、柏克萊資產或其他），案件清單會標示，也可以用「全部債權人」篩選</p>
+          <p>・ 抵押權：不動產標的可以逐筆記錄順位、抵押權人、最高限額與擔保債權</p>
           <p>・ 期日／待辦（拍賣日、詢價期日、補正期限等，可以有好幾個）：30 天內與已過期未完成的會顯示在案件清單上方的「近期期日」</p>
           <p>・ 處理完按「✔ 完成」：填完成日期、辦理單位（本公司或委外單位）與狀況備註，沒有文件也能留下紀錄</p>
           <p>・ 進度紀錄：每次更新可加一筆「日期＋內容」，進度有變時也會自動記錄</p>
@@ -639,6 +643,15 @@
       <div class="form-group"><label class="form-label">執行案號</label><input class="form-control" id="enf-casenumber" placeholder="例：115年度司執助字第1974號（當股）" /></div>
     </div>
     <div class="form-row">
+      <div class="form-group"><label class="form-label">債權人（這筆債權屬於誰）</label><select class="form-control" id="enf-creditor" onchange="onCreditorSel('enf-creditor','enf-creditor-other')"></select>
+        <input class="form-control" id="enf-creditor-other" placeholder="其他債權人名稱" style="display:none;margin-top:6px;" /></div>
+      <div class="form-group"></div>
+    </div>
+    <div id="enf-mort-box" style="background:#fffaf0;border:1px solid #fbd38d;border-radius:8px;padding:10px 12px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="font-size:12px;font-weight:700;color:#975a16;">抵押權設定（不動產；可多筆）</span><button class="btn btn-outline btn-sm" onclick="addMortgageRow()">＋ 新增抵押權</button></div>
+      <div id="enf-mort-rows"></div>
+    </div>
+    <div class="form-row">
       <div class="form-group"><label class="form-label">目前進度</label><select class="form-control" id="enf-status"></select></div>
       <div class="form-group"><label class="form-label">受償金額（元）</label><input class="form-control" type="number" id="enf-recovered" placeholder="0（有領到款項才填）" /></div>
     </div>
@@ -707,6 +720,8 @@
     <div id="cert-preview" style="background:#faf5ff;border:1px solid #d6bcfa;border-radius:8px;padding:8px 12px;font-size:12px;color:#553c9a;margin-bottom:12px;"></div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">債務人</label><input class="form-control" id="cert-debtors" /></div>
+      <div class="form-group"><label class="form-label">債權人</label><select class="form-control" id="cert-creditor" onchange="onCreditorSel('cert-creditor','cert-creditor-other')"></select>
+        <input class="form-control" id="cert-creditor-other" placeholder="其他債權人名稱" style="display:none;margin-top:6px;" /></div>
       <div class="form-group"><label class="form-label">憑證金額（元，選填）</label><input class="form-control" type="number" id="cert-amount" /></div>
     </div>
     <div class="form-group"><label class="form-label">備註</label><input class="form-control" id="cert-notes" /></div>
@@ -1176,6 +1191,8 @@ function renderTable() {
   if (search) cases = cases.filter(c=>c.name.toLowerCase().includes(search)||c.id.toLowerCase().includes(search)||(c.idno||'').toLowerCase().includes(search)||(c.guarantors||[]).some(g=>g.name.toLowerCase().includes(search)));
   if (stage)  cases = cases.filter(c=>c.stage===stage);
   if (court)  cases = cases.filter(c=>c.court===court);
+  const credF = (document.getElementById('filter-creditor')||{}).value;
+  if (credF) { const has=new Set([...loadEnforcements(),...loadCerts()].filter(x=>creditorOf(x)===credF).map(x=>x.caseId)); cases = cases.filter(c=>has.has(c.id)); }
   if (sort==='date-desc')   cases.sort((a,b)=>b.date.localeCompare(a.date));
   else if (sort==='date-asc')    cases.sort((a,b)=>a.date.localeCompare(b.date));
   else if (sort==='amount-desc') cases.sort((a,b)=>Number(b.amount||0)-Number(a.amount||0));
@@ -1196,7 +1213,7 @@ function renderTable() {
       <td style="padding:10px 12px;font-size:12px;font-family:monospace;color:#4a5568;">${c.id}${c.legacy?'<br><span class="enf-chip done" style="background:#edf2f7;color:#4a5568;">舊案</span>':''}</td>
       <td style="padding:10px 12px;font-weight:600;">${c.name} <span class="badge badge-${c.borrowerType||'自然人'}" style="font-size:10px;">${c.borrowerType==='法人'?'法人':'自然人'}</span>${isCert?` <span style="font-size:10px;color:#6b46c1;font-weight:600;">📅${certCount}次</span>`:''}</td>
       <td style="padding:10px 12px;color:#c53030;font-weight:600;">${fmtM(c.amount)}${c.interest?`<span style='font-size:10px;color:#718096;'>+息${fmtM(c.interest)}</span>`:''}<br><span style='font-size:11px;color:#718096;font-weight:400;'>${c.date?`逾期 ${calcDays(c.date)} 天`:'逾期天數 —'}｜餘${fmtM(c.amount-caseRecoverySummary(c.id).recovered)}</span></td>
-      <td style="padding:10px 12px;"><span class="badge badge-${c.stage}">${c.stage}</span>${Object.keys(ENF_TRACKS).map(t=>{const st=enfTrackState(c.id,t);return `<br><span class="enf-chip ${st.cls}">${ENF_TRACKS[t].icon}${t} ${st.label}</span>`;}).join('')}${(()=>{const cs=loadCerts().filter(x=>x.caseId===c.id).map(certState).filter(s=>s.exp).sort((a,b)=>a.exp.localeCompare(b.exp));if(!cs.length)return '';const s0=cs[0];return `<br><span class="enf-chip ${s0.cls==='ok'?'done':'active'}">📜 憑證到期 ${s0.exp}</span>`;})()}</td>
+      <td style="padding:10px 12px;"><span class="badge badge-${c.stage}">${c.stage}</span>${Object.keys(ENF_TRACKS).map(t=>{const st=enfTrackState(c.id,t);return `<br><span class="enf-chip ${st.cls}">${ENF_TRACKS[t].icon}${t} ${st.label}</span>`;}).join('')}${(()=>{const cs=loadCerts().filter(x=>x.caseId===c.id).map(certState).filter(s=>s.exp).sort((a,b)=>a.exp.localeCompare(b.exp));if(!cs.length)return '';const s0=cs[0];return `<br><span class="enf-chip ${s0.cls==='ok'?'done':'active'}">📜 憑證到期 ${s0.exp}</span>`;})()}${(()=>{const cr=[...new Set([...loadEnforcements(),...loadCerts()].filter(x=>x.caseId===c.id).map(creditorOf).filter(v=>v!==OWN_CREDITOR))];return cr.length?'<br>'+cr.map(v=>`<span class="cred-chip">${escH(v)}</span>`).join(''):'';})()}</td>
       <td style="padding:10px 12px;font-size:12px;color:#4a5568;">${c.lawyer||'—'}</td>
       <td style="padding:10px 12px;font-size:12px;color:#4a5568;">${c.court||'—'}</td>
       <td style="padding:10px 12px;font-size:12px;color:#c53030;font-weight:600;">${totalOut>0?fmtM(totalOut):'—'}</td>
@@ -1720,6 +1737,34 @@ function viewDetail(id) {
   openModal('detail-modal');
 }
 
+// ── 債權人（債權歸屬）與抵押權 ──────────────────────
+const CREDITORS = ['台灣聯合（本公司）','合經投資','柏克萊資產'];
+const OWN_CREDITOR = CREDITORS[0];
+function creditorOf(x){ return (x&&x.creditor)||OWN_CREDITOR; }
+function creditorChip(x){ const c=creditorOf(x); return c===OWN_CREDITOR?'':`<span class="cred-chip">${escH(c)}</span>`; }
+function fillCreditorSelect(selId, otherId, val){
+  const v=val||OWN_CREDITOR, known=CREDITORS.includes(v);
+  document.getElementById(selId).innerHTML=[...CREDITORS,'其他'].map(c=>`<option ${(known?c===v:c==='其他')?'selected':''}>${c}</option>`).join('');
+  const o=document.getElementById(otherId); o.value=known?'':v; o.style.display=known?'none':'block';
+}
+function readCreditor(selId, otherId){ const v=document.getElementById(selId).value; return v==='其他'?(document.getElementById(otherId).value.trim()||'其他'):v; }
+function onCreditorSel(selId, otherId){ document.getElementById(otherId).style.display=document.getElementById(selId).value==='其他'?'block':'none'; }
+function mortgageText(m){ return `${m.rank?'第'+m.rank+'順位 ':''}${m.holder||'—'}${m.amount?' 最高限額 '+Number(m.amount).toLocaleString('zh-TW')+' 元':''}${m.note?'（'+m.note+'）':''}`; }
+function renderMortgageRows(list){
+  const wrap=document.getElementById('enf-mort-rows');
+  wrap.innerHTML=(list||[]).map((m,i)=>`<div class="mort-row" style="display:flex;gap:6px;margin-bottom:6px;">
+    <input class="form-control" style="width:64px;" type="number" min="1" placeholder="順位" value="${escH(m.rank||'')}" />
+    <input class="form-control" style="flex:1;" placeholder="抵押權人（例：台中商業銀行）" value="${escH(m.holder||'')}" />
+    <input class="form-control" style="width:130px;" type="number" placeholder="最高限額（元）" value="${escH(m.amount||'')}" />
+    <input class="form-control" style="flex:1;" placeholder="擔保債權／備註" value="${escH(m.note||'')}" />
+    <button class="btn btn-danger btn-sm" onclick="this.parentNode.remove()">✕</button></div>`).join('');
+}
+function addMortgageRow(){ const cur=readMortgageRows(); cur.push({}); renderMortgageRows(cur); }
+function readMortgageRows(){
+  return [...document.querySelectorAll('#enf-mort-rows .mort-row')].map(r=>{ const v=[...r.querySelectorAll('input')].map(i=>i.value.trim());
+    return {rank:v[0]?Number(v[0]):'', holder:v[1], amount:v[2]?Number(v[2]):'', note:v[3]}; }).filter(m=>m.holder||m.amount||m.rank);
+}
+
 // ── 強制執行明細（不動產／動產）────────────────────
 const ENF_TRACKS = {
   '不動產': {
@@ -1766,7 +1811,8 @@ function enfItemHtml(e){
         <button class="btn btn-danger btn-sm" onclick="deleteEnforcement('${e.id}')">刪除</button>
       </div>
     </div>
-    <div class="enf-meta">債務人：${escH(e.debtor||'—')}｜${escH(e.court||'—')} ${escH(e.casenumber||'')}</div>
+    <div class="enf-meta">${creditorChip(e)}債務人：${escH(e.debtor||'—')}｜${escH(e.court||'—')} ${escH(e.casenumber||'')}</div>
+    ${(e.mortgages||[]).length?`<div class="enf-meta">抵押權：${(e.mortgages||[]).slice().sort((a,b)=>(a.rank||99)-(b.rank||99)).map(m=>escH(mortgageText(m))).join('｜')}</div>`:''}
     <div><span class="enf-status ${closed?'closed':''}">${escH(e.status)}</span>${Number(e.recovered||0)>0?` <span style="color:#276749;font-weight:600;margin-left:6px;">受償 ${fmtM(e.recovered)}</span>`:''}</div>
     ${next}${logHtml}
   </div>`;
@@ -1801,6 +1847,9 @@ function openEnfModal(caseId, track, id=''){
   const tgt=document.getElementById('enf-target'); tgt.placeholder=cfg.placeholder; tgt.value=e?e.target:'';
   document.getElementById('enf-court').value=e?e.court||'':(c.court||'');
   document.getElementById('enf-casenumber').value=e?e.casenumber||'':'';
+  fillCreditorSelect('enf-creditor','enf-creditor-other',e?e.creditor:'');
+  document.getElementById('enf-mort-box').style.display=track==='不動產'?'block':'none';
+  renderMortgageRows(e?e.mortgages||[]:[]);
   document.getElementById('enf-recovered').value=e&&e.recovered?e.recovered:'';
   document.getElementById('enf-dl-date').value='';
   document.getElementById('enf-dl-note').value='';
@@ -1888,6 +1937,8 @@ function saveEnforcement(){
     casenumber:document.getElementById('enf-casenumber').value.trim(),
     status:document.getElementById('enf-status').value,
     recovered:Number(document.getElementById('enf-recovered').value)||0,
+    creditor:readCreditor('enf-creditor','enf-creditor-other'),
+    mortgages:document.getElementById('enf-track').value==='不動產'?readMortgageRows():[],
     deadlines:old?(old.deadlines||[]).slice():[],
     logs:old?(old.logs||[]).slice():[],
   };
@@ -1900,6 +1951,7 @@ function saveEnforcement(){
   if(logText) data.logs.push({id:uid('L'),date:logDate,text:logText});
   else if(!old) data.logs.push({id:uid('L'),date:logDate,text:`建立標的，進度：${data.status}`});
   else if(old.status!==data.status) data.logs.push({id:uid('L'),date:logDate,text:`進度改為：${data.status}`});
+  if(old&&creditorOf(old)!==creditorOf(data)) data.logs.push({id:uid('L'),date:logDate,text:`債權人改為：${creditorOf(data)}`});
   saveEnforcements(old?list.map(x=>x.id===id?data:x):[...list,data]);
   closeModal('enf-modal'); refresh(); viewDetail(caseId);
 }
@@ -1936,12 +1988,21 @@ function importEnforcementsFile(input){
     });
     const key=e=>`${e.caseId}|${e.track}|${String(e.target||'').trim()}`;
     const have=new Set(existing.map(key));
-    const add=[], dup=[], noCase=new Set(), bad=[];
+    const add=[], dup=[], noCase=new Set(), bad=[], filledEnf=[];
     incoming.forEach(e=>{
       const cfg=ENF_TRACKS[e.track];
       if(!cfg||!String(e.target||'').trim()){ bad.push(e.target||'(無標的)'); return; }
       if(!cases.some(c=>c.id===e.caseId)){ noCase.add(e.caseId); return; }
-      if(have.has(key(e))){ dup.push(e.target); return; }
+      if(have.has(key(e))){
+        // 已存在：只補上原本空白的債權人／抵押權欄位，不覆蓋既有資料
+        const ex=existing.find(x=>key(x)===key(e));
+        if(ex && ((e.creditor&&!ex.creditor)||((e.mortgages||[]).length&&!(ex.mortgages||[]).length))){
+          if(e.creditor&&!ex.creditor) ex.creditor=e.creditor;
+          if((e.mortgages||[]).length&&!(ex.mortgages||[]).length) ex.mortgages=e.mortgages;
+          (ex.logs=ex.logs||[]).push({id:uid('L'),date:today(),text:'由匯入檔補上債權人／抵押權資料'}); filledEnf.push(ex);
+        } else dup.push(e.target);
+        return;
+      }
       have.add(key(e));
       const status=cfg.statuses.includes(e.status)?e.status:cfg.statuses[0];
       const logs=(e.logs||[]).filter(l=>l&&l.text).map(l=>({id:uid('L'),date:l.date||today(),text:String(l.text)}));
@@ -1950,7 +2011,8 @@ function importEnforcementsFile(input){
       add.push({id:uid('E'),caseId:e.caseId,track:e.track,
         kind:cfg.kinds.includes(e.kind)?e.kind:'其他',target:String(e.target).trim(),
         debtor:e.debtor||'',court:e.court||'',casenumber:e.casenumber||'',status,
-        recovered:Number(e.recovered)||0,
+        recovered:Number(e.recovered)||0, creditor:e.creditor||'',
+        mortgages:Array.isArray(e.mortgages)?e.mortgages.filter(m=>m&&(m.holder||m.amount)).map(m=>({rank:m.rank||'',holder:m.holder||'',amount:m.amount||'',note:m.note||''})):[],
         deadlines:(e.deadlines||[]).filter(d=>d&&d.date).map(d=>({id:uid('D'),date:d.date,note:d.note||'（未填事項）',done:false})),
         logs});
     });
@@ -1981,15 +2043,20 @@ function importEnforcementsFile(input){
     // 債權憑證：同 id，或同案件＋同字號，視為已存在
     const exCerts=loadCerts(); const certKey=x=>`${x.caseId}|${String(x.certNo||'').trim()}`;
     const certIds=new Set(exCerts.map(x=>x.id)), certKeys=new Set(exCerts.filter(x=>x.certNo).map(certKey));
-    const addCerts=[], dupCerts=[];
+    const addCerts=[], dupCerts=[], filledCerts=[];
     (Array.isArray(data)?[]:(data.certs||[])).forEach(x=>{
       if(!x||!x.caseId||!x.issueDate){ bad.push((x&&x.certNo)||'(債權憑證)'); return; }
       if(!cases.some(c=>c.id===x.caseId)){ noCase.add(x.caseId); return; }
-      if((x.id&&certIds.has(x.id))||(x.certNo&&certKeys.has(certKey(x)))){ dupCerts.push(x); return; }
+      if((x.id&&certIds.has(x.id))||(x.certNo&&certKeys.has(certKey(x)))){
+        const ex=exCerts.find(y=>y.id===x.id||(x.certNo&&certKey(y)===certKey(x)));
+        if(ex && x.creditor && !ex.creditor){ ex.creditor=x.creditor; (ex.logs=ex.logs||[]).push({id:uid('L'),date:today(),text:'由匯入檔補上債權人'}); filledCerts.push(ex); }
+        else dupCerts.push(x);
+        return;
+      }
       const basis=CERT_BASIS[x.basis]?x.basis:'其他';
       const rec={id:x.id||uid('C'), caseId:x.caseId, court:x.court||'', certNo:x.certNo||'', issueDate:x.issueDate, basis,
         years:Number(x.years)||CERT_BASIS[basis], interruptDate:x.interruptDate||x.issueDate, remindDays:Number(x.remindDays)||180,
-        debtors:x.debtors||'', amount:Number(x.amount)||0, notes:x.notes||'',
+        debtors:x.debtors||'', amount:Number(x.amount)||0, notes:x.notes||'', creditor:x.creditor||'',
         logs:[...(x.logs||[]).filter(l=>l&&l.text).map(l=>({id:uid('L'),date:l.date||today(),text:String(l.text)})),{id:uid('L'),date:today(),text:'由匯入檔建立'}]};
       certIds.add(rec.id); if(rec.certNo) certKeys.add(certKey(rec)); addCerts.push(rec);
     });
@@ -1997,6 +2064,8 @@ function importEnforcementsFile(input){
     if(addCases.length) lines.push(`將新增 ${addCases.length} 件案件（舊案）：${addCases.map(c=>c.name).join('、')}`);
     if(dupCases.length) lines.push(`略過 ${dupCases.length} 件案件（系統已有同名或同編號）`);
     if(incoming.length) lines.push(`將新增 ${add.length} 筆執行標的`);
+    if(filledEnf.length) lines.push(`將替 ${filledEnf.length} 筆既有執行標的補上債權人／抵押權`);
+    if(filledCerts.length) lines.push(`將替 ${filledCerts.length} 張既有債權憑證補上債權人`);
     if(addFees.length||dupFees.length) lines.push(`將新增 ${addFees.length} 筆代墊費用（合計 ${addFees.reduce((s,f)=>s+f.amount,0).toLocaleString('zh-TW')} 元）`);
     if(addOffs.length||dupOffs.length) lines.push(`將新增 ${addOffs.length} 筆費用沖銷`);
     if(addCerts.length||dupCerts.length) lines.push(`將新增 ${addCerts.length} 筆債權憑證`);
@@ -2006,15 +2075,15 @@ function importEnforcementsFile(input){
     if(dupOffs.length) lines.push(`略過 ${dupOffs.length} 筆費用沖銷（系統已有）`);
     if(noCase.size) lines.push(`略過 ${[...noCase].length} 個系統內找不到的案件：${[...noCase].join('、')}`);
     if(bad.length) lines.push(`略過 ${bad.length} 筆格式不完整的資料`);
-    if(!addCases.length&&!add.length&&!addFees.length&&!addOffs.length&&!addCerts.length){ alert(lines.join('\n')||'檔案裡沒有可以匯入的資料'); return; }
-    if(!confirm(lines.join('\n')+'\n\n只會新增，不會修改或刪除現有資料。確定匯入？')) return;
+    if(!addCases.length&&!add.length&&!addFees.length&&!addOffs.length&&!addCerts.length&&!filledEnf.length&&!filledCerts.length){ alert(lines.join('\n')||'檔案裡沒有可以匯入的資料'); return; }
+    if(!confirm(lines.join('\n')+'\n\n只會新增資料，或替既有資料補上原本空白的欄位；不會覆蓋或刪除現有資料。確定匯入？')) return;
     if(addCases.length) saveCases([...loadCases(),...addCases]);
-    if(add.length) saveEnforcements([...existing,...add]);
+    if(add.length||filledEnf.length) saveEnforcements([...existing,...add]);
     if(addFees.length) saveFees([...exFees,...addFees]);
     if(addOffs.length) saveOffsets([...exOffs,...addOffs]);
-    if(addCerts.length) saveCerts([...exCerts,...addCerts]);
+    if(addCerts.length||filledCerts.length) saveCerts([...exCerts,...addCerts]);
     refresh();
-    alert(`已匯入：案件 ${addCases.length} 件、執行標的 ${add.length} 筆、代墊費用 ${addFees.length} 筆、費用沖銷 ${addOffs.length} 筆、債權憑證 ${addCerts.length} 筆。`);
+    alert(`已匯入：案件 ${addCases.length} 件、執行標的 ${add.length} 筆、代墊費用 ${addFees.length} 筆、費用沖銷 ${addOffs.length} 筆、債權憑證 ${addCerts.length} 筆${filledEnf.length||filledCerts.length?`；補上欄位：執行標的 ${filledEnf.length} 筆、債權憑證 ${filledCerts.length} 張`:''}。`);
   };
   reader.readAsText(file,'utf-8');
 }
@@ -2039,7 +2108,7 @@ function renderCertSection(c){
     const logs=(x.logs||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
     return `<div class="cert-item ${st.cls}">
       <div style="display:flex;justify-content:space-between;gap:6px;align-items:flex-start;">
-        <div><b>${escH(x.certNo||'（未填字號）')}</b> <span class="cert-state ${st.cls}">${st.label}</span></div>
+        <div>${creditorChip(x)}<b>${escH(x.certNo||'（未填字號）')}</b> <span class="cert-state ${st.cls}">${st.label}</span></div>
         <div style="display:flex;gap:4px;flex-shrink:0;">
           <button class="btn btn-success btn-sm" onclick="openCertRenew('${x.id}')">🔄 已換發</button>
           <button class="btn btn-outline btn-sm" onclick="openCertModal('${c.id}','${x.id}')">更新</button>
@@ -2071,6 +2140,7 @@ function openCertModal(caseId, id=''){
   document.getElementById('cert-remind').value=String(x?x.remindDays||180:180);
   document.getElementById('cert-debtors').value=x?x.debtors||'':[c.name,...(c.guarantors||[]).map(g=>g.name)].filter(Boolean).join('、');
   document.getElementById('cert-amount').value=x&&x.amount?x.amount:'';
+  fillCreditorSelect('cert-creditor','cert-creditor-other',x?x.creditor:'');
   document.getElementById('cert-notes').value=x?x.notes||'':'';
   updateCertPreview();
   openModal('cert-modal');
@@ -2094,6 +2164,7 @@ function saveCert(){
     interruptDate:document.getElementById('cert-interrupt').value||issueDate,
     remindDays:Number(document.getElementById('cert-remind').value)||180,
     debtors:document.getElementById('cert-debtors').value.trim(), amount:Number(document.getElementById('cert-amount').value)||0,
+    creditor:readCreditor('cert-creditor','cert-creditor-other'),
     notes:document.getElementById('cert-notes').value.trim(), logs:old?(old.logs||[]).slice():[] };
   if(!old) data.logs.push({id:uid('L'),date:today(),text:`建立債權憑證紀錄，時效到期 ${certExpiry(data)}`});
   else if(certExpiry(old)!==certExpiry(data)) data.logs.push({id:uid('L'),date:today(),text:`到期日由 ${certExpiry(old)} 改為 ${certExpiry(data)}`});
@@ -3797,13 +3868,13 @@ function buildCsvContent() {
     return [r.caseId,c?c.name:'',r.date,r.amount,r.notes||''];
   });
 
-  const enfHeaders=['案件編號','借款人','執行類別','標的類別','標的說明','債務人','執行法院','執行案號','目前進度','受償金額','未完成期日／待辦','已完成待辦','進度紀錄'];
+  const enfHeaders=['案件編號','借款人','執行類別','標的類別','標的說明','債權人','債務人','執行法院','執行案號','目前進度','受償金額','抵押權','未完成期日／待辦','已完成待辦','進度紀錄'];
   const enfRows=loadEnforcements().map(e=>{
     const c=cases.find(c=>c.id===e.caseId);
     const logs=(e.logs||[]).slice().sort((a,b)=>a.date.localeCompare(b.date)).map(l=>`${l.date} ${l.text}`).join('；');
     const openDl=openDeadlines(e).map(d=>`${d.date} ${d.note}`).join('；');
     const doneDl=(e.deadlines||[]).filter(d=>d.done).map(d=>`${d.date} ${d.note}（${d.doneDate} 完成，${d.handler||''}${d.doneNote?'，'+d.doneNote:''}）`).join('；');
-    return [e.caseId,c?c.name:'',e.track,e.kind,e.target,e.debtor||'',e.court||'',e.casenumber||'',e.status,e.recovered||0,openDl,doneDl,logs];
+    return [e.caseId,c?c.name:'',e.track,e.kind,e.target,creditorOf(e),e.debtor||'',e.court||'',e.casenumber||'',e.status,e.recovered||0,(e.mortgages||[]).map(mortgageText).join('；'),openDl,doneDl,logs];
   });
 
   let csv='﻿';
@@ -3817,10 +3888,10 @@ function buildCsvContent() {
   recRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
   csv+='\n=== 強制執行明細 ===\n'+enfHeaders.map(esc).join(',')+'\n';
   enfRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
-  const certHeaders=['案件編號','借款人','核發法院','債權憑證字號','核發日期','執行名義','時效年數','最近重新起算日','時效到期日','狀態','債務人','憑證金額','備註','紀錄'];
+  const certHeaders=['案件編號','借款人','債權人','核發法院','債權憑證字號','核發日期','執行名義','時效年數','最近重新起算日','時效到期日','狀態','債務人','憑證金額','備註','紀錄'];
   csv+='\n=== 債權憑證效期 ===\n'+certHeaders.map(esc).join(',')+'\n';
   loadCerts().forEach(x=>{ const c=cases.find(c=>c.id===x.caseId); const st=certState(x);
-    csv+=[x.caseId,c?c.name:'',x.court||'',x.certNo||'',x.issueDate||'',x.basis||'',x.years||'',x.interruptDate||'',st.exp||'',st.label,x.debtors||'',x.amount||0,x.notes||'',(x.logs||[]).map(l=>`${l.date} ${l.text}`).join('；')].map(esc).join(',')+'\n'; });
+    csv+=[x.caseId,c?c.name:'',creditorOf(x),x.court||'',x.certNo||'',x.issueDate||'',x.basis||'',x.years||'',x.interruptDate||'',st.exp||'',st.label,x.debtors||'',x.amount||0,x.notes||'',(x.logs||[]).map(l=>`${l.date} ${l.text}`).join('；')].map(esc).join(',')+'\n'; });
   csv+='\n=== 債權憑證年度調閱記錄 ===\n'+revHeaders.map(esc).join(',')+'\n';
   revRows.forEach(r=>{csv+=r.map(esc).join(',')+'\n';});
   return csv;
