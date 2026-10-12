@@ -2016,6 +2016,35 @@ function importEnforcementsFile(input){
         deadlines:(e.deadlines||[]).filter(d=>d&&d.date).map(d=>({id:uid('D'),date:d.date,note:d.note||'（未填事項）',done:false})),
         logs});
     });
+    // 既有標的的更新（每日法院文件排程產出）：只追加期日與紀錄；進度只有在系統目前進度與 fromStatus 相同時才改
+    const updEnf=[], updNoMatch=[], updStatusSkip=[]; let updDl=0, updLog=0, updSt=0;
+    (Array.isArray(data)?[]:(data.updates||[])).forEach(u=>{
+      const tgt=String((u&&u.target)||'').trim();
+      if(!u||!u.caseId||!tgt){ bad.push('(更新)'); return; }
+      const pool=[...existing,...add].filter(x=>x.caseId===u.caseId&&(!u.track||x.track===u.track));
+      let ex=pool.find(x=>String(x.target||'').trim()===tgt);
+      if(!ex){ const near=pool.filter(x=>{const t=String(x.target||'').trim(); return t&&(t.includes(tgt)||tgt.includes(t));}); if(near.length===1) ex=near[0]; }
+      if(!ex){ updNoMatch.push(`${u.caseId} ${tgt}`); return; }
+      let changed=false;
+      ex.deadlines=ex.deadlines||[]; ex.logs=ex.logs||[];
+      (u.addDeadlines||[]).filter(d=>d&&d.date).forEach(d=>{
+        const note=String(d.note||'（未填事項）').trim();
+        if(ex.deadlines.some(y=>y.date===d.date&&String(y.note||'').trim()===note)) return;
+        ex.deadlines.push({id:uid('D'),date:d.date,note,done:false}); updDl++; changed=true;
+      });
+      (u.addLogs||[]).filter(l=>l&&l.text).forEach(l=>{
+        const date=l.date||today(), text=String(l.text).trim();
+        if(ex.logs.some(y=>y.date===date&&String(y.text||'').trim()===text)) return;
+        ex.logs.push({id:uid('L'),date,text}); updLog++; changed=true;
+      });
+      const cfg=ENF_TRACKS[ex.track];
+      if(u.status&&u.status!==ex.status&&cfg&&cfg.statuses.includes(u.status)){
+        if(u.fromStatus&&u.fromStatus===ex.status){
+          ex.logs.push({id:uid('L'),date:today(),text:`進度改為：${u.status}（由匯入檔）`}); ex.status=u.status; updSt++; changed=true;
+        } else updStatusSkip.push(`${u.caseId} ${tgt}（系統目前：${ex.status}）`);
+      }
+      if(changed&&!updEnf.includes(ex)) updEnf.push(ex);
+    });
     // 代墊費用：同 id，或同案件＋同日期＋同金額＋同說明，視為已存在
     const FEE_TYPES=['律師費','訴訟費','存證信函費','查址費','徵信費','執行費','委外催收費','其他費用'];
     const exFees=loadFees(), exOffs=loadOffsets();
@@ -2065,6 +2094,9 @@ function importEnforcementsFile(input){
     if(dupCases.length) lines.push(`略過 ${dupCases.length} 件案件（系統已有同名或同編號）`);
     if(incoming.length) lines.push(`將新增 ${add.length} 筆執行標的`);
     if(filledEnf.length) lines.push(`將替 ${filledEnf.length} 筆既有執行標的補上債權人／抵押權`);
+    if(updEnf.length) lines.push(`將更新 ${updEnf.length} 筆既有執行標的：新增期日 ${updDl} 個、紀錄 ${updLog} 筆、改進度 ${updSt} 筆`);
+    if(updStatusSkip.length) lines.push(`以下標的進度已有人改過，不更動進度（期日與紀錄照常新增）：\n  ${updStatusSkip.join('\n  ')}`);
+    if(updNoMatch.length) lines.push(`以下更新對不到系統內的標的，已略過：\n  ${updNoMatch.join('\n  ')}`);
     if(filledCerts.length) lines.push(`將替 ${filledCerts.length} 張既有債權憑證補上債權人`);
     if(addFees.length||dupFees.length) lines.push(`將新增 ${addFees.length} 筆代墊費用（合計 ${addFees.reduce((s,f)=>s+f.amount,0).toLocaleString('zh-TW')} 元）`);
     if(addOffs.length||dupOffs.length) lines.push(`將新增 ${addOffs.length} 筆費用沖銷`);
@@ -2075,15 +2107,15 @@ function importEnforcementsFile(input){
     if(dupOffs.length) lines.push(`略過 ${dupOffs.length} 筆費用沖銷（系統已有）`);
     if(noCase.size) lines.push(`略過 ${[...noCase].length} 個系統內找不到的案件：${[...noCase].join('、')}`);
     if(bad.length) lines.push(`略過 ${bad.length} 筆格式不完整的資料`);
-    if(!addCases.length&&!add.length&&!addFees.length&&!addOffs.length&&!addCerts.length&&!filledEnf.length&&!filledCerts.length){ alert(lines.join('\n')||'檔案裡沒有可以匯入的資料'); return; }
-    if(!confirm(lines.join('\n')+'\n\n只會新增資料，或替既有資料補上原本空白的欄位；不會覆蓋或刪除現有資料。確定匯入？')) return;
+    if(!addCases.length&&!add.length&&!addFees.length&&!addOffs.length&&!addCerts.length&&!filledEnf.length&&!filledCerts.length&&!updEnf.length){ alert(lines.join('\n')||'檔案裡沒有可以匯入的資料'); return; }
+    if(!confirm(lines.join('\n')+'\n\n只會新增資料、替既有資料補上空白欄位或追加期日與紀錄；不會刪除現有資料。確定匯入？')) return;
     if(addCases.length) saveCases([...loadCases(),...addCases]);
-    if(add.length||filledEnf.length) saveEnforcements([...existing,...add]);
+    if(add.length||filledEnf.length||updEnf.length) saveEnforcements([...existing,...add]);
     if(addFees.length) saveFees([...exFees,...addFees]);
     if(addOffs.length) saveOffsets([...exOffs,...addOffs]);
     if(addCerts.length||filledCerts.length) saveCerts([...exCerts,...addCerts]);
     refresh();
-    alert(`已匯入：案件 ${addCases.length} 件、執行標的 ${add.length} 筆、代墊費用 ${addFees.length} 筆、費用沖銷 ${addOffs.length} 筆、債權憑證 ${addCerts.length} 筆${filledEnf.length||filledCerts.length?`；補上欄位：執行標的 ${filledEnf.length} 筆、債權憑證 ${filledCerts.length} 張`:''}。`);
+    alert(`已匯入：案件 ${addCases.length} 件、執行標的 ${add.length} 筆、代墊費用 ${addFees.length} 筆、費用沖銷 ${addOffs.length} 筆、債權憑證 ${addCerts.length} 筆${filledEnf.length||filledCerts.length?`；補上欄位：執行標的 ${filledEnf.length} 筆、債權憑證 ${filledCerts.length} 張`:''}${updEnf.length?`；更新既有標的 ${updEnf.length} 筆（期日 ${updDl}、紀錄 ${updLog}、進度 ${updSt}）`:''}。`);
   };
   reader.readAsText(file,'utf-8');
 }
