@@ -1979,9 +1979,12 @@ function importEnforcementsFile(input){
     (Array.isArray(data)?[]:(data.cases||[])).forEach(c=>{
       const name=String((c&&c.name)||'').trim();
       if(!name){ return; }
-      if(cases.some(x=>x.id===c.id||String(x.name||'').trim()===name)){ dupCases.push(name); return; }
+      // 有案件編號時只比對編號（同一借款人可能有多筆案件）；沒有編號的舊案才比對借款人名稱
+      if(cases.some(x=>c.id?x.id===c.id:String(x.name||'').trim()===name)){ dupCases.push(c.id?`${name}（${c.id}）`:name); return; }
       const rec={id:c.id||legacyId(), date:c.date||'', name, idno:c.idno||'', borrowerType:c.borrowerType==='法人'?'法人':(c.borrowerType||'法人'),
         guarantors:Array.isArray(c.guarantors)?c.guarantors:[], amount:Number(c.amount)||0, interest:Number(c.interest)||0,
+        birthday:c.birthday||'', bphone:c.bphone||'', domicile:c.domicile||'', sameResidence:c.residence?false:true, residence:c.residence||'',
+        comprep:c.comprep||'', noteAmount:Number(c.noteAmount)||0, days:c.date?calcDays(c.date):0,
         stage:ALL_STAGES.includes(c.stage)?c.stage:'債權憑證', court:c.court||'', lawyer:c.lawyer||'', casenumber:c.casenumber||'',
         gdlink:c.gdlink||'', notes:c.notes||'', legacy:c.legacy!==false};
       cases.push(rec); addCases.push(rec);
@@ -2090,8 +2093,8 @@ function importEnforcementsFile(input){
       certIds.add(rec.id); if(rec.certNo) certKeys.add(certKey(rec)); addCerts.push(rec);
     });
     const lines=[];
-    if(addCases.length) lines.push(`將新增 ${addCases.length} 件案件（舊案）：${addCases.map(c=>c.name).join('、')}`);
-    if(dupCases.length) lines.push(`略過 ${dupCases.length} 件案件（系統已有同名或同編號）`);
+    if(addCases.length) lines.push(`將新增 ${addCases.length} 件案件：${addCases.map(c=>`${c.name}（${c.id}${c.legacy?'，舊案':''}）`).join('、')}`);
+    if(dupCases.length) lines.push(`略過 ${dupCases.length} 件案件（系統已有同編號，或無編號而同名）：${dupCases.join('、')}`);
     if(incoming.length) lines.push(`將新增 ${add.length} 筆執行標的`);
     if(filledEnf.length) lines.push(`將替 ${filledEnf.length} 筆既有執行標的補上債權人／抵押權`);
     if(updEnf.length) lines.push(`將更新 ${updEnf.length} 筆既有執行標的：新增期日 ${updDl} 個、紀錄 ${updLog} 筆、改進度 ${updSt} 筆`);
