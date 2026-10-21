@@ -3205,44 +3205,84 @@ function genCertifiedLetterDoc(c,s){
   // 保證人
   (c.guarantors||[]).forEach(g=>{if(g.name) recips.push({name:g.name,addr:g.domicile||''});});
 
+  // 收件人多時縮小字級，維持在郵局用紙的寄件人／收件人欄內
+  const recipFs=recips.length<=2?'9pt':recips.length<=4?'8pt':'7pt';
   const recipNums=['二','三','四','五','六','七','八','九'];
   const recipHtml=recips.map((r,i)=>`
-    <div class="pty">
-      <span class="pn">${recipNums[i]||''}、收件人</span>
-      <span>姓名：${r.name}</span>
-    </div>
-    <div class="pty" style="padding-left:72px;">詳細地址：${r.addr}</div>`
-  ).join('');
+      <div class="pl" style="font-size:${recipFs};"><span class="pk">${recipNums[i]||''}、收件人</span>姓名：${r.name}</div>
+      <div class="pl pa" style="font-size:${recipFs};">詳細地址：${r.addr}</div>`).join('');
 
-  // ── 10行×20格 Grid ────────────────────────────────
+  // ── 10 行×20 格（依郵局存證信函用紙：每格 8.2mm × 12mm）──────
   const rowLbls=['一','二','三','四','五','六','七','八','九','十'];
   const colNums=Array.from({length:20},(_,i)=>i+1);
-
   function buildGrid(arr,offset=0){
-    const hdr=`<tr><th class="gh">格<br>行</th>${colNums.map(n=>`<th class="gh">${n}</th>`).join('')}</tr>`;
+    const hdr=`<tr><th class="gh gcorner"><span class="gc-c">格</span><span class="gc-r">行</span></th>${colNums.map(n=>`<th class="gh">${n}</th>`).join('')}</tr>`;
     const rows=rowLbls.map((lbl,ri)=>{
       const cells=colNums.map((_,ci)=>{
-        const idx=offset+ri*20+ci;
-        const item=arr[idx];
+        const item=arr[offset+ri*20+ci];
         if(!item) return `<td class="gc ec" contenteditable="true"></td>`;
         if(item.type==='blank') return `<td class="gc bc" contenteditable="true"></td>`;
         return `<td class="gc fc" contenteditable="true">${item.ch}</td>`;
       }).join('');
       return `<tr><td class="gr">${lbl}</td>${cells}</tr>`;
     }).join('');
-    // 欄號列單獨一個表格固定高度，只有 10 行內文撐滿頁面
-    return `<table class="gtbl ghdr">${hdr}</table><table class="gtbl gbody">${rows}</table>`;
+    return `<table class="gtbl">${hdr}${rows}</table>`;
   }
 
-  const gridHtml=buildGrid(textArr);
-  // 內文超過 200 格（10 行×20 格）時，接續頁照同一格式往下排，不截掉文字
-  const extraPages=[];
-  for(let off=200;off<textArr.length;off+=200){
-    extraPages.push(`<div class="pg">
-  <div class="ftitle">郵　局　存　證　信　函　用　紙（第 ${off/200+1} 頁）</div>
-  <div class="gwrap">${buildGrid(textArr,off)}</div>
-</div>`);
+  // 內文超過 200 格時接續下一張用紙（每張都是完整的郵局格式）
+  const pageCount=Math.max(1,Math.ceil(textArr.length/200));
+  function buildPage(pi){
+    const first=pi===0;
+    return `<div class="pg">
+  <div class="fside">副<br>正<br>本</div>
+  <div class="ftitle">郵局存證信函用紙</div>
+  <div class="frame">
+    <div class="fhdr">
+      <div class="hl">
+        <div class="hl-post">郵　局</div>
+        <div class="hl-no">存證信函第<span class="hl-gap"></span>號</div>
+      </div>
+      <div class="hr">
+        <div class="hr-note">〈寄件人如為機關、團體、學校、公司、商號請加蓋單位圖章及法定代理人簽名或蓋章〉</div>
+        <div class="seal">印</div>
+        <div class="pl"><span class="pk">一、寄件人</span>姓名：${first?(s.creditorName||'')+(s.legalRep?'　'+s.legalRep:''):''}</div>
+        <div class="pl pa">詳細地址：${first?(s.address||''):''}</div>
+        ${first?recipHtml:`<div class="pl"><span class="pk">二、收件人</span>姓名：</div><div class="pl pa">詳細地址：</div>`}
+        <div class="hr-foot">（本欄姓名、地址不敷填寫時，請另紙聯記）</div>
+      </div>
+    </div>
+    ${buildGrid(textArr,pi*200)}
+    <div class="fbot">
+      <div class="fb-left">
+        <div class="fee">
+          <div>本存證信函共　<b>${pageCount}</b>　頁，正本　　　份，存證費　　　　元，</div>
+          <div class="fee-i">副本　　　份，存證費　　　　元，</div>
+          <div class="fee-i">附件　　　張，存證費　　　　元，</div>
+          <div class="fee-i">加具正本　　　份，存證費　　　　元，</div>
+          <div class="fee-i">加具副本　　　份，存證費　　　　元，合計　　　　元。</div>
+          <div class="fee-cert"><span>經　　　　郵局</span><span class="stampc">郵戳</span><span>經辦員</span></div>
+          <div class="fee-cert"><span>　年　　月　　日證明正副本內容完全相同</span><span></span><span>主管　　　<span class="inbox">印</span></span></div>
+        </div>
+        <div class="memo">
+          <div class="memo-t">備<br><br><br>註</div>
+          <div class="memo-b">
+            <div>一、存證信函需送交郵局辦理證明手續後始有效，自交寄之日起由郵局保存之副本，於三年期滿後銷燬之。</div>
+            <div>二、在　　頁　　行第　　格下塗改增刪　　字 <span class="inbox">印</span>（如有修改應填註本欄並蓋用寄件人印章，但塗改增刪每頁至多不得逾二十字。）</div>
+            <div>三、每件一式三份，用不脫色筆或打字機複寫，或書寫後複印、影印，每格限書一字，色澤明顯、字跡端正。</div>
+          </div>
+        </div>
+      </div>
+      <div class="fb-right">
+        <div class="st st1"><span>黏</span><span>貼</span></div>
+        <div class="st st2"><div>郵　票　或</div><div>郵　資　券</div></div>
+        <div class="st st3"><span>處</span><span></span></div>
+      </div>
+    </div>
+  </div>
+  <div class="seam s1">騎縫郵戳</div><div class="seam s2">騎縫郵戳</div>
+</div>`;
   }
+  const pagesHtml=Array.from({length:pageCount},(_,i)=>buildPage(i)).join('\n');
 
   // ── HTML ──────────────────────────────────────────
   return `<!DOCTYPE html>
@@ -3251,128 +3291,77 @@ function genCertifiedLetterDoc(c,s){
 <meta charset="UTF-8">
 <title>存證信函 - ${c.name}</title>
 <style>
-@page{size:A4;margin:6mm;}
-@media print{
-  .toolbar{display:none!important;}
-  body{background:white;margin:0;padding:0;}
-  .pg{width:198mm!important;height:284mm!important;min-height:0!important;margin:0 auto!important;box-shadow:none!important;}
-  .gc{font-size:14pt;}
-  .gc:focus{outline:none;}
-  .bc{background:#fffde7!important;}
-  .pg{break-inside:avoid;page-break-inside:avoid;}
-  .pg+.pg{break-before:page;page-break-before:always;}
-}
+/* 版面依郵局存證信函用紙（A4）：外框左 22.5mm、右 11mm、上 27.6mm，格子每格 8.2×12mm */
+@page{size:A4;margin:0;}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'標楷體','DFKai-SB',serif;font-size:10pt;background:#c9d4dc;}
+body{font-family:'標楷體','DFKai-SB','BiauKai',serif;background:#c9d4dc;color:#000;}
 .toolbar{position:fixed;top:0;left:0;right:0;background:#744210;color:white;padding:8px 16px;display:flex;align-items:center;gap:10px;z-index:100;font-family:-apple-system,sans-serif;font-size:13px;}
-.pg{width:794px;min-height:1100px;margin:56px auto 40px;background:white;border:1.5px solid #000;box-shadow:0 4px 20px rgba(0,0,0,.15);display:flex;flex-direction:column;overflow:hidden;}
-/* 內文格子撐滿頁面剩餘高度，印出來是整張 A4 */
-.gwrap{flex:1;display:flex;flex-direction:column;}
-.gwrap .gbody{flex:1;height:100%;}
-.gbody tr:first-child td{border-top:none;}
-.gh:first-child{width:24px;}
-
-/* 標題 */
-.ftitle{text-align:center;font-size:14pt;letter-spacing:8px;border-bottom:1.5px solid #000;padding:6px 0;font-weight:bold;}
-
-/* header */
-.fhdr{display:flex;border-bottom:1.5px solid #000;}
-.hl{width:150px;flex-shrink:0;border-right:1.5px solid #000;padding:6px 8px;font-size:9pt;}
-.hr{flex:1;padding:4px 8px;font-size:9pt;position:relative;}
-.hr-note{font-size:7.5pt;color:#444;margin-bottom:3px;}
-.seal{position:absolute;top:4px;right:8px;border:1px solid #aaa;width:44px;height:44px;text-align:center;font-size:7pt;color:#888;display:flex;align-items:center;justify-content:center;}
-.pty{line-height:1.7;font-size:9pt;}
-.pn{display:inline-block;width:68px;}
-
-/* Grid */
+.pg{position:relative;width:210mm;height:297mm;margin:56px auto 24px;background:white;box-shadow:0 4px 20px rgba(0,0,0,.15);overflow:hidden;}
+.pg+.pg{margin-top:0;}
+.fside{position:absolute;left:9mm;top:28mm;font-size:12pt;line-height:1.6;}
+.ftitle{position:absolute;left:22.5mm;width:176.5mm;top:15mm;text-align:center;font-size:17pt;letter-spacing:6mm;text-indent:6mm;}
+.frame{position:absolute;left:22.5mm;top:27.6mm;width:176.5mm;border:1.2px solid #000;}
+.fhdr{display:flex;height:50.7mm;border-bottom:1.2px solid #000;}
+.hl{width:57.1mm;border-right:1.2px solid #000;position:relative;}
+.hl-post{position:absolute;right:6mm;top:7mm;font-size:14pt;}
+.hl-no{position:absolute;left:4mm;top:24mm;font-size:13pt;white-space:nowrap;}
+.hl-gap{display:inline-block;width:22mm;}
+.hr{flex:1;padding:1mm 3mm 0 3mm;position:relative;overflow:hidden;}
+.hr-note{font-size:7pt;margin-bottom:.6mm;}
+.seal{position:absolute;right:3mm;top:6mm;border:1px solid #000;font-size:7pt;padding:0 1px;}
+.pl{font-size:9pt;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pk{display:inline-block;width:19mm;}
+.pa{padding-left:19mm;}
+.hr-foot{font-size:7.5pt;margin-top:.4mm;}
 .gtbl{width:100%;border-collapse:collapse;table-layout:fixed;}
-.gh{background:#e8e8e8;font-size:7pt;font-weight:normal;height:20px;padding:1px;border:1px solid #000;text-align:center;vertical-align:middle;}
-.gr{background:#e8e8e8;font-size:9pt;border:1px solid #000;text-align:center;vertical-align:middle;width:24px;}
-.gc{height:30px;font-size:13pt;border:1px solid #000;text-align:center;vertical-align:middle;cursor:text;}
+.gh{height:11.9mm;font-size:8pt;font-weight:normal;border:1px solid #000;text-align:center;vertical-align:middle;font-family:Helvetica,Arial,sans-serif;}
+.gh:first-child,.gr{width:9mm;}
+.gcorner{position:relative;background:linear-gradient(to top right,transparent calc(50% - .5px),#000 50%,transparent calc(50% + .5px));}
+.gc-c{position:absolute;right:1mm;top:.5mm;font-size:7pt;font-family:'標楷體','DFKai-SB',serif;}
+.gc-r{position:absolute;left:1mm;bottom:.5mm;font-size:7pt;font-family:'標楷體','DFKai-SB',serif;}
+.gr{height:12mm;font-size:8pt;border:1px solid #000;text-align:center;vertical-align:middle;}
+.gc{height:12mm;font-size:15pt;border:1px solid #000;text-align:center;vertical-align:middle;cursor:text;padding:0;}
 .gc:focus{outline:2px solid #c05621;background:#fffbeb;}
-.fc{background:#fff;}
 .bc{background:#fffde7;}
-.ec{background:#fafafa;}
-
-/* bottom */
-.fbot{border-top:1.5px solid #000;display:flex;align-items:stretch;}
-.fee{flex:1;padding:4px 6px;border-right:1px solid #000;font-size:7.5pt;line-height:2;}
-.stmp{width:120px;display:flex;flex-direction:column;border-right:1px solid #000;}
-.stmp-t{text-align:center;font-weight:bold;border-bottom:1px solid #000;padding:3px;font-size:8pt;}
-.post{width:60px;display:flex;flex-direction:column;align-items:center;justify-content:space-around;padding:4px 2px;font-size:9pt;border-right:1px solid #000;}
-.note{flex:1;padding:4px 6px;font-size:7pt;line-height:1.6;}
-.note-t{font-weight:bold;margin-bottom:3px;font-size:8pt;}
-.ni{margin:2px 0;}
+.fbot{display:flex;height:66.7mm;border-top:1.2px solid #000;}
+.fb-left{flex:1;display:flex;flex-direction:column;border-right:1.2px solid #000;}
+.fee{height:31.2mm;border-bottom:1.2px solid #000;padding:.6mm 1.5mm 0;font-size:8pt;line-height:1.22;overflow:hidden;}
+.fee-i{padding-left:29mm;}
+.fee-cert{display:flex;justify-content:space-between;align-items:center;font-size:8pt;line-height:1.2;}
+.stampc{display:inline-flex;width:8mm;height:8mm;border:1px dashed #666;border-radius:50%;align-items:center;justify-content:center;font-size:7pt;}
+.inbox{border:1px solid #000;padding:0 1px;font-size:7pt;}
+.memo{flex:1;display:flex;}
+.memo-t{width:10.3mm;border-right:1.2px solid #000;display:flex;align-items:center;justify-content:center;text-align:center;font-size:12pt;line-height:1.1;}
+.memo-b{flex:1;padding:1mm 1.5mm;font-size:8.5pt;line-height:1.45;}
+.memo-b>div{padding-left:2.2em;text-indent:-2.2em;margin-bottom:.6mm;}
+.fb-right{width:50.4mm;display:flex;flex-direction:column;}
+.st{display:flex;font-size:12pt;}
+.st1{height:26.9mm;border-bottom:1.2px solid #000;}
+.st2{height:21.5mm;border-bottom:1.2px solid #000;flex-direction:column;justify-content:center;padding-left:5mm;line-height:2;}
+.st3{flex:1;}
+.st1>span,.st3>span{flex:1;display:flex;align-items:center;justify-content:center;}
+.st1>span:first-child,.st3>span:first-child{border-right:1.2px solid #000;}
+.seam{position:absolute;top:279mm;width:20mm;height:20mm;border:1px dotted #666;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7pt;}
+.seam.s1{left:59mm;}.seam.s2{left:120mm;}
+@media print{
+  body{background:white;}
+  .toolbar{display:none!important;}
+  .pg{margin:0!important;box-shadow:none!important;break-after:page;page-break-after:always;}
+  .pg:last-child{break-after:auto;page-break-after:auto;}
+  .gc:focus{outline:none;}
+  .bc{background:#fffde7!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+}
 </style>
 </head>
 <body>
 <div class="toolbar">
   <span>📋 存證信函 ─ ${c.name}</span>
   <span style="flex:1"></span>
-  <span style="font-size:11px;opacity:.7;">黃色格子為待填寫欄位，點擊可直接修改</span>
+  <span style="font-size:11px;opacity:.7;">黃色格子為待填寫欄位，點擊可直接修改；列印時縮放請選 100%、邊界選「無」</span>
   <button onclick="window.print()" style="background:#c05621;color:white;border:none;padding:6px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">🖨 列印／存成 PDF</button>
   <button onclick="window.close()" style="background:rgba(255,255,255,.15);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:13px;">✕ 關閉</button>
 </div>
-
-<div class="pg">
-  <div class="ftitle">郵　局　存　證　信　函　用　紙</div>
-
-  <div class="fhdr">
-    <!-- 左欄 -->
-    <div class="hl">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;">
-        <div style="writing-mode:vertical-rl;letter-spacing:3px;font-size:9pt;border:1px solid #000;padding:2px 4px;">副正本</div>
-        <div style="font-size:11pt;letter-spacing:4px;text-align:center;flex:1;">郵　局</div>
-      </div>
-      <div style="font-size:9pt;margin-top:8px;">存證信函第</div>
-      <div style="border-bottom:1px solid #000;width:60px;margin:4px 0 2px;"></div>
-      <div style="font-size:9pt;">號</div>
-    </div>
-
-    <!-- 右欄 -->
-    <div class="hr">
-      <div class="seal">印</div>
-      <div class="hr-note">〈寄件人如為機關、團體、學校、公司、商號請加蓋單位圖章及法定代理人簽名或蓋章〉</div>
-      <div class="pty"><span class="pn">一、寄件人</span>姓名：${s.creditorName||''}${s.legalRep?'　'+s.legalRep:''}</div>
-      <div class="pty" style="padding-left:68px;">詳細地址：${s.address||''}</div>
-      ${recipHtml}
-      <div style="font-size:7.5pt;color:#555;margin-top:2px;">（本欄姓名、地址不敷填寫時，請另紙聯記）</div>
-    </div>
-  </div>
-
-  <!-- 10行×20格 內文 -->
-  <div class="gwrap">${gridHtml}</div>
-
-  <!-- 底部 -->
-  <div class="fbot">
-    <div class="fee">
-      本存證信函共　　頁，正本　　份，存證費　　　元，<br>
-      &emsp;副本　　份，存證費　　　元，<br>
-      &emsp;附件　　張，存證費　　　元，<br>
-      &emsp;加具正本　　份，存證費　　　元，<br>
-      &emsp;加具副本　　份，存證費　　　元，合計　　　元。<br>
-      <span style="font-size:8pt;">經　　　　郵局正<br>
-      　年　月　日證明副本內容完全相同
-      <span style="margin-left:8px;">郵戳</span>
-      <span style="margin-left:12px;">經辦員</span>
-      <span style="margin-left:12px;">主管</span>
-      <span style="border:1px solid #000;padding:1px 8px;margin-left:6px;">印</span></span>
-    </div>
-    <div class="stmp">
-      <div class="stmp-t">黏　　貼</div>
-    </div>
-    <div class="post">
-      <span>郵</span><span>票</span><span>或</span><span>郵</span><span>資</span><span>券</span><span>處</span>
-    </div>
-    <div class="note">
-      <div class="note-t">備　　註</div>
-      <div class="ni">一、存證信函需送交郵局辦理證明手續後始有效，自交寄之日起由郵局保存之副本，於三年期滿後銷燬之。</div>
-      <div class="ni">二、在　頁　行第　格下塗改增刪　字　印（如有修改應填註本欄並蓋用寄件人印章，但塗改增刪每頁至多不得逾二十字。）</div>
-      <div class="ni">三、每件一式三份，用不脫色筆或打字機複寫，或書寫後複印、影印，每格限書一字，色澤明顯、字跡端正。</div>
-    </div>
-  </div>
-</div>
-${extraPages.join('\n')}
+${pagesHtml}
 </body>
 </html>`;
 }
