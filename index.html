@@ -3171,6 +3171,9 @@ function genCertifiedLetterDoc(c,s){
 
   // ── 建立內文字元陣列 ──────────────────────────────
   const amtCN=numToChinese(Math.floor(Number(c.noteAmount||c.amount)||0));
+  const noteAmt=Math.floor(Number(c.noteAmount)||0), balAmt=Math.floor(Number(c.amount)||0);
+  const balanceDiffers=noteAmt>0&&balAmt>0&&noteAmt!==balAmt;
+  const balCN=numToChinese(balAmt);
   const f=str=>str.split('').map(ch=>({ch,type:'fixed'}));
   const b=()=>({ch:'',type:'blank'});
 
@@ -3179,7 +3182,10 @@ function genCertifiedLetterDoc(c,s){
   const textArr=[
     ...f('敬啟者：台端於民國'),b(),b(),b(),...f('年'),b(),b(),...f('月'),b(),b(),...f('日向'),
     ...f('本公司借款新台幣'),...f(amtCN),...f('元整，並開立同'),
-    ...f('金額兌付本票乙紙作為還款之擔保，現因台端'),
+    ...f('金額兌付本票乙紙作為還款之擔保'),
+    // 本票金額與逾期本金不同（已還部分本金）時，補一句目前本金餘額；日期留空手動填
+    ...(balanceDiffers?[...f('，截至'),b(),b(),b(),...f('年'),b(),b(),...f('月'),b(),b(),...f('日本金餘額新台幣'),...f(balCN),...f('元整')]:[]),
+    ...f('，現因台端'),
     ...f('未於約定期限內定期還款，有遲延之情形發生'),
     ...f('，依借貸合約條款規定視為提前到期，為保障'),
     ...f('投資人之權益，特函通知台端限期於民國'),b(),b(),b(),...f('年'),b(),b(),...f('月'),b(),b(),...f('日前償還剩餘本金，請於限期'),
@@ -3213,11 +3219,11 @@ function genCertifiedLetterDoc(c,s){
   const rowLbls=['一','二','三','四','五','六','七','八','九','十'];
   const colNums=Array.from({length:20},(_,i)=>i+1);
 
-  function buildGrid(arr){
+  function buildGrid(arr,offset=0){
     const hdr=`<tr><th class="gh">格<br>行</th>${colNums.map(n=>`<th class="gh">${n}</th>`).join('')}</tr>`;
     const rows=rowLbls.map((lbl,ri)=>{
       const cells=colNums.map((_,ci)=>{
-        const idx=ri*20+ci;
+        const idx=offset+ri*20+ci;
         const item=arr[idx];
         if(!item) return `<td class="gc ec" contenteditable="true"></td>`;
         if(item.type==='blank') return `<td class="gc bc" contenteditable="true"></td>`;
@@ -3229,6 +3235,14 @@ function genCertifiedLetterDoc(c,s){
   }
 
   const gridHtml=buildGrid(textArr);
+  // 內文超過 200 格（10 行×20 格）時，接續頁照同一格式往下排，不截掉文字
+  const extraPages=[];
+  for(let off=200;off<textArr.length;off+=200){
+    extraPages.push(`<div class="pg">
+  <div class="ftitle">郵　局　存　證　信　函　用　紙（第 ${off/200+1} 頁）</div>
+  ${buildGrid(textArr,off)}
+</div>`);
+  }
 
   // ── HTML ──────────────────────────────────────────
   return `<!DOCTYPE html>
@@ -3245,6 +3259,7 @@ function genCertifiedLetterDoc(c,s){
   .gc:focus{outline:none;}
   .bc{background:#fffde7!important;}
   .pg{break-inside:avoid;page-break-inside:avoid;}
+  .pg+.pg{break-before:page;page-break-before:always;}
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'標楷體','DFKai-SB',serif;font-size:10pt;background:#c9d4dc;}
@@ -3351,6 +3366,7 @@ body{font-family:'標楷體','DFKai-SB',serif;font-size:10pt;background:#c9d4dc;
     </div>
   </div>
 </div>
+${extraPages.join('\n')}
 </body>
 </html>`;
 }
