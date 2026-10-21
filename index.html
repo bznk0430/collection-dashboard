@@ -3195,10 +3195,9 @@ function genCertifiedLetterDoc(c,s){
 
   // ── 收件人列表（自動從案件資料帶入）────────────────
   const recips=[];
-  // 借款人（若法人：先列公司，再列本人）
+  // 借款人（法人只列公司；代表人通常已列在連保人，不另列一筆避免重複）
   if(c.borrowerType==='法人'){
     recips.push({name:c.name+(c.comprep?'　代表人：'+c.comprep:''),addr:c.domicile||''});
-    if(c.comprep) recips.push({name:c.comprep,addr:c.domicile||''});
   } else {
     recips.push({name:c.name,addr:c.domicile||''});
     if(!c.sameResidence&&c.residence) recips.push({name:c.name,addr:c.residence});
