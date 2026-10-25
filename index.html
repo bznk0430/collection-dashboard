@@ -920,20 +920,23 @@
 
 <script>
 // ── 資料層 ────────────────────────────────────────
-const CASES_KEY      = 'bznk_cases_v1';
-const FEES_KEY       = 'bznk_fees_v2';
-const REVIEWS_KEY    = 'bznk_reviews_v1';
-const RECOVERIES_KEY = 'bznk_recoveries_v1';
-const OFFSETS_KEY    = 'bznk_offsets_v1';
-const ENFORCE_KEY    = 'bznk_enforcements_v1';
-const CERTS_KEY      = 'bznk_certs_v1';
+// 示範模式（網址加 ?demo=1）：載入虛構案件，不登入、不連共用資料庫、不備份，資料存在另一組 demo_ 開頭的瀏覽器欄位
+const DEMO_MODE = (()=>{ try{ return new URLSearchParams(location.search).get('demo')==='1'; }catch(e){ return false; } })();
+const KP = DEMO_MODE ? 'demo_' : '';
+const CASES_KEY      = KP+'bznk_cases_v1';
+const FEES_KEY       = KP+'bznk_fees_v2';
+const REVIEWS_KEY    = KP+'bznk_reviews_v1';
+const RECOVERIES_KEY = KP+'bznk_recoveries_v1';
+const OFFSETS_KEY    = KP+'bznk_offsets_v1';
+const ENFORCE_KEY    = KP+'bznk_enforcements_v1';
+const CERTS_KEY      = KP+'bznk_certs_v1';
 
 // ── 資料存取：本機（localStorage）或共用資料庫（Firestore）──────────
 // 預設使用共用資料庫；網址加 ?cloud=0 切回本機資料（會記住），?cloud=1 恢復共用資料庫
-(function(){ try{ const p=new URLSearchParams(location.search).get('cloud');
+(function(){ try{ if(new URLSearchParams(location.search).get('demo')==='1') return; const p=new URLSearchParams(location.search).get('cloud');
   if(p==='1') localStorage.setItem('bznk_cloud_mode','1');
   if(p==='0') localStorage.setItem('bznk_cloud_mode','0'); }catch(e){} })();
-const CLOUD_MODE = (()=>{ try{ return localStorage.getItem('bznk_cloud_mode')!=='0'; }catch(e){ return true; } })();
+const CLOUD_MODE = DEMO_MODE ? false : (()=>{ try{ return localStorage.getItem('bznk_cloud_mode')!=='0'; }catch(e){ return true; } })();
 const STORES = { cases:CASES_KEY, fees:FEES_KEY, reviews:REVIEWS_KEY, recoveries:RECOVERIES_KEY, offsets:OFFSETS_KEY, enforcements:ENFORCE_KEY, certs:CERTS_KEY };
 const _cloud = { ready:false, data:{ cases:[], fees:[], reviews:[], recoveries:[], offsets:[], enforcements:[], certs:[], settings:{} } };
 function localLoad(key, def) { try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(def)); } catch(e) { return def; } }
@@ -1022,6 +1025,7 @@ async function maybeMigrateLocalToCloud() {
 }
 function renderDataMode() {
   const el=document.getElementById('data-mode'); if(!el) return;
+  if (DEMO_MODE) { el.textContent='🎬 示範模式（虛構資料，重新整理即還原）'; el.title='示範用的虛構案件，不連共用資料庫、不備份；重新整理頁面會還原成初始示範資料'; el.style.background='#fefcbf'; el.style.color='#744210'; return; }
   el.textContent = CLOUD_MODE ? '☁ 共用資料庫' : '💻 本機資料';
   el.title = CLOUD_MODE ? '資料存在共用資料庫，所有同事看到同一份（網址加 ?cloud=0 切回本機資料）' : '資料只存在這台電腦的瀏覽器（網址加 ?cloud=1 恢復共用資料庫）';
 }
@@ -1118,6 +1122,94 @@ function seedData() {
   saveReviews([
     { id:'R001', caseId:'CC2601-1021', year:2025, taxdate:'2025-06-30', reviewdate:'2025-07-15', property:'名下無不動產、無車輛登記', income:'全年所得 0 元，無薪資收入', asset:'無', action:'繼續監控（明年再調閱）', execfee:0, notes:'持續追蹤' },
   ]);
+}
+
+// ── 示範模式資料（全部為虛構，日期以開啟當天推算，近期期日一定有內容）──────
+function seedDemoData() {
+  Object.values(STORES).forEach(k=>localStorage.removeItem(k));
+  localStorage.removeItem(SETTINGS_KEY);
+  const d=n=>{ const x=new Date(); x.setDate(x.getDate()+n); return x.toISOString().slice(0,10); };
+  const y=n=>{ const x=new Date(); x.setFullYear(x.getFullYear()+n); return x.toISOString().slice(0,10); };
+  const yd=(yrs,days)=>{ const x=new Date(); x.setFullYear(x.getFullYear()+yrs); x.setDate(x.getDate()+days); return x.toISOString().slice(0,10); };
+  const L=(date,text)=>({id:uid('L'),date,text});
+  const DL=(date,note,done)=>done?{id:uid('D'),date,note,done:true,doneDate:date,handler:'本公司',doneNote:'已完成'}:{id:uid('D'),date,note,done:false};
+  const P=(name,idno,addr)=>({type:'自然人',name,idno,domicile:addr});
+  const co=(o)=>Object.assign({borrowerType:'法人',legacy:false,interest:0,court:'',lawyer:'',casenumber:'',gdlink:'',sameResidence:true,residence:''},o);
+  const cases=[
+    co({id:'C100000008',date:d(-2),name:'星河數位有限公司（示範）',idno:'00000008',comprep:'何星河',domicile:'臺北市示範區星河路8號',noteAmount:300000,amount:300000,interest:2000,stage:'催告',
+       guarantors:[P('何星河','A100000008','臺北市示範區星河路8號')],
+       notes:'C 案（企業專案，純信用）。D+1 電話、簡訊都聯繫不上 → 依流程 D+2（今天）寄存證信函。'}),
+    co({id:'T100000001',date:d(-10),name:'晨光精密有限公司（示範）',idno:'00000001',comprep:'陳晨光',domicile:'新北市示範區晨光路1號',noteAmount:500000,amount:480000,interest:3200,stage:'存證信函',
+       guarantors:[P('陳晨光','A100000001','新北市示範區晨光路1號'),P('陳曉雯','A200000001','新北市示範區晨光路1號')],
+       notes:'T 案（客票貼現）退票。有聯繫未協商 → D+3 已寄存證信函；D+16 聲請本票裁定。本票 50 萬、本金餘額 48 萬（存證信函會自動加上「截至○年○月○日本金餘額」一句）。'}),
+    co({id:'C100000002',date:d(-45),name:'青禾餐飲有限公司（示範）',idno:'00000002',comprep:'林青禾',domicile:'臺中市示範區青禾路2號',noteAmount:300000,amount:276000,interest:5100,stage:'本票裁定',
+       court:'臺灣嘉義地方法院',casenumber:'115年度司票字第0002號（示範）',lawyer:'委外：示範法律事務所',
+       guarantors:[P('林青禾','B100000002','臺中市示範區青禾路2號')],
+       notes:'C 案（貸動三十）。存證信函 D+7 寄出，D+21 向嘉義地院簡易庭聲請本票裁定，等待裁定確定。'}),
+    co({id:'D100000003',date:d(-150),name:'宏遠營造有限公司（示範）',idno:'00000003',comprep:'張宏遠',domicile:'臺南市示範區宏遠路3號',noteAmount:1800000,amount:1800000,interest:42000,stage:'強制執行',
+       court:'臺灣臺南地方法院',casenumber:'115年度司執字第0003號（示範）',lawyer:'委外：示範法律事務所',
+       guarantors:[P('張宏遠','D100000003','臺南市示範區宏遠路3號'),P('王美玲','D200000003','臺南市示範區宏遠路3號')],
+       notes:'D 案（企業專案，不動產副擔保）。房地進入第 2 次拍賣；動產扣薪中，部分債權屬合經投資。'}),
+    co({id:'R100000004',date:d(-60),name:'林大同（示範）',borrowerType:'自然人',idno:'E100000004',domicile:'高雄市示範區大同路4號',noteAmount:2450000,amount:2350000,interest:31000,stage:'強制執行',
+       court:'臺灣高雄地方法院',casenumber:'115年度司執字第0004號（示範）',
+       guarantors:[P('林小同','E200000004','高雄市示範區大同路4號')],
+       notes:'R 案（個人不動產）。本公司第二順位最高限額抵押；已鑑價，等待詢價期日。'}),
+    co({id:'C100000005',date:d(-400),name:'藍海物流股份有限公司（示範）',idno:'00000005',comprep:'吳藍海',domicile:'桃園市示範區藍海路5號',noteAmount:650000,amount:650000,interest:0,stage:'債權憑證',
+       court:'臺灣桃園地方法院',
+       guarantors:[P('吳藍海','H100000005','桃園市示範區藍海路5號')],
+       notes:'強制執行無財產可供執行，已取得債權憑證；債權憑證正本在合作資產公司（柏克萊資產）。每年調閱財產所得清單。'}),
+    co({id:'OLD-DEMO-0001',date:'',name:'周小美（示範舊案）',borrowerType:'自然人',idno:'F100000006',domicile:'新竹市示範區舊城路6號',amount:420000,stage:'債權憑證',legacy:true,
+       guarantors:[],notes:'早期舊案，無平台案件編號，只追蹤債權憑證效期。'}),
+    co({id:'D100000007',date:d(-120),name:'安心家居有限公司（示範）',idno:'00000007',comprep:'許安心',domicile:'嘉義市示範區安心路7號',noteAmount:800000,amount:800000,interest:0,stage:'結案',
+       guarantors:[P('許安心','Q100000007','嘉義市示範區安心路7號')],
+       notes:'本票裁定後協商，分 3 期清償完畢，已結案。'}),
+  ];
+  saveCases(cases);
+  const fees=[
+    {id:'DF01',caseId:'T100000001',date:d(-7),type:'存證信函費',desc:'存證信函規費',amount:229,pay:'公司代墊',receipt:'',isPayment:false},
+    {id:'DF02',caseId:'T100000001',date:d(-7),type:'委外催收費',desc:'存證信函服務費',amount:600,pay:'公司代墊',receipt:'',isPayment:false},
+    {id:'DF03',caseId:'C100000002',date:d(-38),type:'存證信函費',desc:'存證信函規費',amount:161,pay:'公司代墊',receipt:'',isPayment:false},
+    {id:'DF04',caseId:'C100000002',date:d(-24),type:'執行費',desc:'本票裁定聲請費',amount:1000,pay:'公司代墊',receipt:'',isPayment:false},
+    {id:'DF05',caseId:'C100000002',date:d(-24),type:'委外催收費',desc:'本票裁定服務費',amount:3000,pay:'公司代墊',receipt:'',isPayment:false},
+    {id:'DF06',caseId:'D100000003',date:d(-120),type:'執行費',desc:'強制執行費',amount:14400,pay:'公司代墊',receipt:'',isPayment:false},
+    {id:'DF07',caseId:'D100000003',date:d(-118),type:'委外催收費',desc:'強制執行服務費',amount:10000,pay:'公司代墊',receipt:'',isPayment:false},
+    {id:'DF08',caseId:'D100000003',date:d(-80),type:'其他費用',desc:'鑑價費',amount:12000,pay:'公司代墊',receipt:'',isPayment:false},
+    {id:'DF09',caseId:'R100000004',date:d(-40),type:'執行費',desc:'強制執行費',amount:18800,pay:'公司代墊',receipt:'',isPayment:false},
+    {id:'DF10',caseId:'C100000005',date:d(-300),type:'執行費',desc:'強制執行費',amount:5200,pay:'公司代墊',receipt:'',isPayment:false},
+    {id:'DF11',caseId:'D100000007',date:d(-100),type:'執行費',desc:'本票裁定聲請費',amount:1000,pay:'公司代墊',receipt:'',isPayment:false},
+  ];
+  saveFees(fees);
+  saveOffsets([{id:'DO01',feeId:'DF11',caseId:'D100000007',date:d(-30),amount:1000,notes:'結清時一併收回'}]);
+  saveRecoveries([
+    {id:'DR01',caseId:'D100000007',date:d(-90),amount:300000,notes:'協商第 1 期'},
+    {id:'DR02',caseId:'D100000007',date:d(-60),amount:300000,notes:'協商第 2 期'},
+    {id:'DR03',caseId:'D100000007',date:d(-30),amount:200000,notes:'協商第 3 期，結清'},
+    {id:'DR04',caseId:'D100000003',date:d(-20),amount:36000,notes:'扣薪受償（三個月）'},
+  ]);
+  saveEnforcements([
+    {id:'DE01',caseId:'D100000003',track:'不動產',kind:'房地',target:'臺南市示範區宏遠段 100 地號＋200 建號（宏遠路 3 號）',creditor:'台灣聯合（本公司）',debtor:'張宏遠',court:'臺灣臺南地方法院',casenumber:'115年度司執字第0003號（示範）',status:'第2次拍賣',recovered:0,
+     mortgages:[{rank:'1',holder:'示範商業銀行',amount:'6,000,000',note:''},{rank:'2',holder:'台灣聯合（本公司）',amount:'2,160,000',note:'最高限額'}],
+     deadlines:[DL(d(-25),'第1次拍賣 10:30',true),DL(d(9),'第2次拍賣 10:30 投標（底價打 8 折）'),DL(d(30),'確認拍定與否，準備陳報債權計算書')],
+     logs:[L(d(-120),'聲請強制執行，繳執行費 14,400 元'),L(d(-100),'查封登記'),L(d(-80),'法院鑑價'),L(d(-25),'第 1 次拍賣無人應買（流標）')]},
+    {id:'DE02',caseId:'D100000003',track:'動產',kind:'薪資',target:'張宏遠於示範工程顧問公司之薪資',creditor:'合經投資',debtor:'張宏遠',court:'臺灣臺南地方法院',casenumber:'115年度司執字第0003號（示範）',status:'按月扣薪中',recovered:36000,
+     mortgages:[],deadlines:[],logs:[L(d(-100),'核發扣押命令（薪資 1/3）'),L(d(-20),'收到三個月扣薪款 36,000 元')]},
+    {id:'DE03',caseId:'D100000003',track:'動產',kind:'銀行存款',target:'宏遠營造示範銀行存款',creditor:'台灣聯合（本公司）',debtor:'宏遠營造有限公司（示範）',court:'臺灣臺南地方法院',casenumber:'115年度司執字第0003號（示範）',status:'第三人陳報－無款',recovered:0,
+     mortgages:[],deadlines:[],logs:[L(d(-110),'核發扣押命令'),L(d(-95),'銀行陳報：無存款')]},
+    {id:'DE04',caseId:'R100000004',track:'不動產',kind:'房地',target:'高雄市示範區大同段 400 地號＋500 建號（大同路 4 號）',creditor:'台灣聯合（本公司）',debtor:'林大同（示範）',court:'臺灣高雄地方法院',casenumber:'115年度司執字第0004號（示範）',status:'詢價／定底價',recovered:0,
+     mortgages:[{rank:'1',holder:'示範商業銀行',amount:'4,200,000',note:''},{rank:'2',holder:'台灣聯合（本公司）',amount:'3,680,000',note:'最高限額'}],
+     deadlines:[DL(d(-3),'補正：陳報債權計算書（文到 5 日內）'),DL(d(4),'詢價期日：陳報底價意見')],
+     logs:[L(d(-50),'聲請強制執行'),L(d(-35),'查封登記'),L(d(-15),'鑑定價 9,800,000 元')]},
+  ]);
+  saveCerts([
+    {id:'DC01',caseId:'C100000005',court:'臺灣桃園地方法院',certNo:'113年度司執字第0005號（示範）',issueDate:yd(-3,60),basis:'本票裁定',years:3,interruptDate:'',remindDays:180,debtors:'藍海物流股份有限公司（示範）、吳藍海',amount:650000,creditor:'柏克萊資產',notes:'正本在柏克萊資產，屆期前要聲請換發',logs:[L(y(-3),'取得債權憑證')]},
+    {id:'DC02',caseId:'OLD-DEMO-0001',court:'臺灣新竹地方法院',certNo:'111年度司執字第0006號（示範）',issueDate:y(-4),basis:'確定判決',years:5,interruptDate:'',remindDays:365,debtors:'周小美（示範舊案）',amount:420000,creditor:'台灣聯合（本公司）',notes:'',logs:[L(y(-4),'取得債權憑證')]},
+  ]);
+  saveReviews([
+    {id:'DV01',caseId:'C100000005',year:new Date().getFullYear()-1,taxdate:d(-200),hasAsset:false,action:'繼續監控（明年再調閱）',execfee:0,notes:'',
+     persons:[{role:'借款人',name:'藍海物流股份有限公司（示範）',idno:'00000005',reviewdate:d(-190),property:'名下無不動產',income:'無營業收入',asset:'無'},
+              {role:'連保人',name:'吳藍海',idno:'H100000005',reviewdate:d(-190),property:'無',income:'薪資所得 0 元',asset:'無'}]},
+  ]);
+  saveSettingsFn({creditorName:'台灣聯合金融科技股份有限公司',creditorId:'',legalRep:'（示範）',phone:'',address:'（示範地址）',agent:'',agentAddr:''});
 }
 
 // ── 統計卡片 ─────────────────────────────────────
@@ -2815,7 +2907,7 @@ function appendToNotes(caseId, text) {
 }
 
 // ── 系統設定 ──────────────────────────────────────
-const SETTINGS_KEY='bznk_settings_v1';
+const SETTINGS_KEY=KP+'bznk_settings_v1';
 function loadSettings(){ if(CLOUD_MODE) return JSON.parse(JSON.stringify(_cloud.data.settings||{})); try{return JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}');}catch(e){return{};} }
 function saveSettingsFn(s){
   if(!CLOUD_MODE){ localStorage.setItem(SETTINGS_KEY,JSON.stringify(s)); return; }
@@ -3864,7 +3956,7 @@ window._driveToken=null; // 儲存 Drive access token
 
 // ── 自動匯出到 GD ─────────────────────────────────
 const AUTO_EXPORT_FOLDER='1biFWELku069XYVxgqfbu6gZpY--vRWSZ';
-const EXPORT_HASH_KEY='bznk_export_hash_v1';
+const EXPORT_HASH_KEY=KP+'bznk_export_hash_v1';
 
 function calcDataHash() {
   // 把所有資料串在一起算 hash（簡單 checksum），本機與共用資料庫模式都適用
@@ -3948,6 +4040,7 @@ function backupOwnerTag() {
   return email.split('@')[0]||'unknown';
 }
 function renderBackupStatus(msg, cls) {
+  if (DEMO_MODE) { const e=document.getElementById('backup-status'); if(e) e.style.display='none'; return; }
   const el=document.getElementById('backup-status'); if(!el) return;
   if(msg){ el.textContent=msg; el.className='backup-status '+(cls||''); return; }
   let last={}; try{ last=JSON.parse(localStorage.getItem(EXPORT_HASH_KEY)||'{}'); }catch(e){}
@@ -3997,6 +4090,7 @@ async function uploadBackupToDrive() {
 
 // 資料有變更時自動備份（只在已取得 Drive 授權時執行）
 async function autoExportToDrive() {
+  if (DEMO_MODE) return;
   if (!window._driveToken || window._exportInProgress) { renderBackupStatus(); return; }
   let last = {};
   try { last = JSON.parse(localStorage.getItem(EXPORT_HASH_KEY)||'{}'); } catch(e){}
@@ -4009,6 +4103,7 @@ async function autoExportToDrive() {
 
 // 手動「立即備份」：未取得 Drive 授權時先跳出 Google 視窗授權，一律重新上傳
 async function manualBackup() {
+  if (DEMO_MODE) { alert('示範模式不會備份到雲端硬碟。'); return; }
   const btn=document.getElementById('backup-btn');
   if (window._exportInProgress) return;
   btn.disabled=true;
@@ -4063,7 +4158,11 @@ function signIn() {
 }
 function signOut(){auth.signOut();}
 
-auth.onAuthStateChanged(user=>{
+if (DEMO_MODE) {
+  document.getElementById('auth-wall').classList.add('hidden');
+  document.getElementById('login-loading').style.display='none';
+  renderDataMode(); seedDemoData(); refresh();
+} else auth.onAuthStateChanged(user=>{
   const wall=document.getElementById('auth-wall'), chip=document.getElementById('user-chip');
   if(user&&user.email.endsWith('@'+ALLOWED_DOMAIN)){
     wall.classList.add('hidden'); chip.style.display='flex';
